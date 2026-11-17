@@ -120,7 +120,7 @@
   "Plot": "地块",
   "Orders": "订单",
   "Plant-machines": "植物机械",
-  "Click a plot to place · Right-click / Esc to cancel · hover a card for details": "点击地块建造 · 右键 / Esc 取消 · 悬停卡片查看详情",
+  "Click a plot to place · Right-click / Esc to cancel · hover a card for details": "点击地块建造 · 按住右键互动 · Esc 取消 · 悬停卡片查看详情",
   "Q/E rotate · WASD / middle-drag pan · wheel zoom · Space pause · R recipe · Del dismantle · F5 save": "Q/E 旋转 · WASD / 中键拖动平移 · 滚轮缩放 · 空格暂停 · R 配方 · Del 拆除 · F5 保存",
   "Weather: calm": "天气：平静",
   "Weather: %s (%ds) — %s": "天气：%s（%d秒）— %s",
@@ -307,5 +307,12 @@
   "Tide interval (0 = manual)": "潮汐间隔秒数（0为手动）",
   "Gather Life and Ember.\nFuse nature through Silence; record and reshape through Eternity.": "规划地块，汇聚生灵与余烬。\n以静默融合自然，以永恒记录与重塑。",
   "Plots have a base class, variant and level. Life and Ember are natural energies; Silence and Eternity are artificial technologies. Tides replenish or draw energy, then trigger paired flips or transformations between different variants of the same base class and level. Heat and moisture determine temperature independently.": "地块由基础类型与变体组成。生灵、余烬是自然能量，静默、永恒是人工技术。潮汐补充或抽离自然能量，并触发成对翻转或同基础同等级转变。温度由热度与湿度独立决定。",
-  "Project Archive": "归档计划"
+  "Project Archive": "归档计划",
+  "Inspect": "查看详情",
+  "Next recipe": "切换配方",
+  "Clear attachment": "清理附着物",
+  "Condense Life": "凝聚生灵",
+  "Condense Ember": "凝聚余烬",
+  "Release": "松开执行",
+  "Unavailable": "不可用"
 }

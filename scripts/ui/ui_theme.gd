@@ -7,7 +7,7 @@ const BG_SOFT := Color(0.17, 0.14, 0.15, 0.95)
 const BORDER := Color("6a5038")
 const BRASS := Color("d9a85a")
 const CREAM := Color("efe2c6")
-const MUTED := Color("a8998a")
+const MUTED := Color("b9b3ab")
 const GOOD := Color("9fd07a")
 const BAD := Color("e8806a")
 
@@ -73,6 +73,7 @@ static func build() -> Theme:
 
 static func label(text: String, size: int = 15, color: Color = CREAM, use_serif: bool = false) -> Label:
 	fonts()
+	size = maxi(size, 13)
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", size)

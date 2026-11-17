@@ -1,7 +1,7 @@
 extends Node3D
 ## Procedural 3D backdrop for a biome: the diorama plateau the 11x11 plot sits on,
 ## the landscape around it, ambient particles, lanterns and weather.
-## Everything is low-poly and built from MeshKit primitives.
+## HD pixel-art environment sprites, textured geometry and compatibility-friendly lighting.
 
 const GROUND_Y: float = -2.6
 const PLATEAU_HALF: float = 9.6
@@ -15,6 +15,8 @@ var _weather_nodes: Dictionary = {}
 var _t: float = 0.0
 var sun: DirectionalLight3D
 var env: Environment
+static var _atlas: Texture2D
+static var _surface_textures: Dictionary = {}
 
 func build(biome_id: String, seed_value: int) -> void:
 	biome = biome_id
@@ -28,6 +30,8 @@ func build(biome_id: String, seed_value: int) -> void:
 		"volcano": _volcano()
 		"snow": _snow()
 	_lanterns()
+	_paint_environment(self)
+	_atmosphere()
 
 func pal(key: String) -> Color:
 	return Data.palette(biome, key)
@@ -40,15 +44,15 @@ func _build_environment() -> void:
 	env.background_color = pal("sky_top")
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = pal("ambient")
-	env.ambient_light_energy = 0.42
+	env.ambient_light_energy = 0.40
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 0.92
+	env.tonemap_exposure = 1.05
 	env.fog_enabled = true
 	env.fog_mode = Environment.FOG_MODE_DEPTH
 	env.fog_light_color = pal("fog")
 	env.fog_density = 1.0
-	env.fog_depth_begin = 52.0
-	env.fog_depth_end = 95.0
+	env.fog_depth_begin = 68.0
+	env.fog_depth_end = 112.0
 	env.fog_depth_curve = 1.6
 	env.glow_enabled = true
 	env.glow_intensity = 0.7
@@ -61,7 +65,7 @@ func _build_environment() -> void:
 	add_child(we)
 	sun = DirectionalLight3D.new()
 	sun.light_color = pal("sun")
-	sun.light_energy = 0.9
+	sun.light_energy = 0.55
 	sun.shadow_enabled = true
 	sun.shadow_opacity = 0.62
 	sun.shadow_blur = 2.0
@@ -114,39 +118,27 @@ func _sway_add(n: Node3D, amount: float) -> void:
 	_sway.append([n, _rng.randf() * TAU, amount])
 
 # ------------------------------------------------------------------ biomes
-func _conifer(p: Vector3, max_h: float, col: Color, snow_cap: bool = false) -> void:
-	var h: float = minf(_rng.randf_range(3.0, 6.5), max_h)
-	var n := Node3D.new()
-	n.position = p
-	add_child(n)
-	MeshKit.cyl(n, Vector3(0, h * 0.12, 0), 0.12, 0.18, h * 0.24, Color("4a3424"), 5)
-	for i in range(3):
-		var y: float = h * (0.28 + i * 0.22)
-		var r: float = h * (0.30 - i * 0.07)
-		MeshKit.cyl(n, Vector3(0, y, 0), 0.02, r, h * 0.34, col.lightened(i * 0.05), 6)
-		if snow_cap: MeshKit.cyl(n, Vector3(0, y + h * 0.1, 0), 0.02, r * 0.55, h * 0.16, Color("e8f0f4"), 6)
-	_sway_add(n, 0.025)
+func _conifer(p: Vector3, max_h: float, _col: Color, snow_cap: bool = false) -> void:
+	_prop(3 if snow_cap else 0, p, minf(_rng.randf_range(4.5, 7.0), max_h))
 
-func _round_tree(p: Vector3, max_h: float, col: Color) -> void:
-	var h: float = minf(_rng.randf_range(2.4, 4.6), max_h)
-	var n := Node3D.new()
-	n.position = p
-	add_child(n)
-	MeshKit.cyl(n, Vector3(0, h * 0.3, 0), 0.12, 0.2, h * 0.6, Color("4e3826"), 5)
-	MeshKit.ball(n, Vector3(0, h * 0.72, 0), Vector3(h * 0.55, h * 0.48, h * 0.55), col, 7, 4)
-	MeshKit.ball(n, Vector3(h * 0.18, h * 0.86, 0.1), Vector3(h * 0.32, h * 0.3, h * 0.32), col.lightened(0.08), 6, 3)
-	_sway_add(n, 0.03)
+func _round_tree(p: Vector3, max_h: float, _col: Color) -> void:
+	_prop(4, p, minf(_rng.randf_range(3.6, 5.6), max_h))
 
-func _rock(p: Vector3, s: float, col: Color) -> void:
-	MeshKit.ball(self, p + Vector3(0, s * 0.25, 0), Vector3(s, s * _rng.randf_range(0.45, 0.8), s * _rng.randf_range(0.7, 1.1)), col, 6, 3)
+func _rock(p: Vector3, size: float, col: Color) -> void:
+	if biome == "snow": _prop(7, p, size * 1.5)
+	elif biome == "volcano": _prop(2, p, size * 1.8)
+	elif biome == "desert": _prop(5, p, size * 1.5)
+	else:
+		var rock: MeshInstance3D = MeshKit.ball(self, p + Vector3(0, size * 0.25, 0), Vector3(size, size * 0.6, size), col, 6, 3)
+		rock.rotation.y = _rng.randf() * TAU
 
 func _forest() -> void:
-	var dark := Color("2f4a37")
-	var mid := Color("46694a")
+	var dark := Color("17364a")
+	var mid := Color("31545c")
 	_scatter(70, 12.0, 34.0, func(p: Vector3, mh: float) -> void:
 		var roll: float = _rng.randf()
 		if roll < 0.5: _conifer(p, mh, dark if _rng.randf() < 0.5 else mid)
-		elif roll < 0.8: _round_tree(p, mh, Color("5e7f45").lerp(Color("7c8f3e"), _rng.randf()))
+		elif roll < 0.8: _round_tree(p, mh, Color("406458").lerp(Color("60714f"), _rng.randf()))
 		elif roll < 0.9: _rock(p, _rng.randf_range(0.6, 1.4), Color("5d6058"))
 		else:
 			# giant mushroom
@@ -160,6 +152,7 @@ func _forest() -> void:
 		var r: float = 15.5 + sin(i * 0.35) * 1.4
 		var seg: MeshInstance3D = MeshKit.box(self, Vector3(1.4, 0.04, 2.4), Vector3(cos(a) * r, GROUND_Y + 0.02, sin(a) * r), water, 0.0, false)
 		seg.rotation.y = -a
+		seg.material_override = _water_material()
 	MeshKit.particles(self, Vector3(0, 1.6, 0), Color("e6f07a"), 40, Vector3(12, 1.6, 12), Vector3(0, 0.15, 0), 0.16, 6.0, 1.5)
 
 func _desert() -> void:
@@ -175,16 +168,7 @@ func _desert() -> void:
 			var c: Color = Color("b0704a").lerp(Color("d9a070"), float(i) / bands)
 			MeshKit.cyl(self, p + Vector3(0, h * (i + 0.5) / bands, 0), r * (1.0 - i * 0.08), r * (1.05 - i * 0.08), h / bands, c, 6))
 	_scatter(26, 11.5, 30.0, func(p: Vector3, mh: float) -> void:
-		var h: float = minf(_rng.randf_range(1.0, 2.4), mh)
-		var n := Node3D.new()
-		n.position = p
-		add_child(n)
-		var c := Color("6f8a4a")
-		MeshKit.cyl(n, Vector3(0, h * 0.5, 0), 0.16, 0.2, h, c, 6)
-		MeshKit.cyl(n, Vector3(0.28, h * 0.55, 0), 0.09, 0.1, h * 0.35, c.lightened(0.05), 5)
-		MeshKit.cyl(n, Vector3(-0.26, h * 0.42, 0), 0.08, 0.1, h * 0.3, c.lightened(0.05), 5)
-		MeshKit.ball(n, Vector3(0, h + 0.05, 0), Vector3(0.22, 0.18, 0.22), Color("e49aa8"), 5, 3)
-		_sway_add(n, 0.01))
+		_prop(1, p, minf(_rng.randf_range(2.0, 3.5), mh)))
 	# Ancient arch
 	var arch := Vector3(-17, GROUND_Y, -13)
 	for side in [-1.6, 1.6]:
@@ -212,13 +196,10 @@ func _volcano() -> void:
 		var roll: float = _rng.randf()
 		if roll < 0.55:
 			var h: float = minf(_rng.randf_range(1.5, 5.0), mh)
-			MeshKit.cyl(self, p + Vector3(0, h * 0.5, 0), 0.05, _rng.randf_range(0.5, 1.1), h, Color("241e24"), 4).rotation.y = _rng.randf() * TAU
+			_prop(2, p, h * 1.4)
 		elif roll < 0.85: _rock(p, _rng.randf_range(0.8, 2.0), rock.lightened(0.08))
 		else:
-			# dead tree
-			var h2: float = minf(_rng.randf_range(1.6, 3.0), mh)
-			MeshKit.cyl(self, p + Vector3(0, h2 * 0.5, 0), 0.06, 0.16, h2, Color("1e1816"), 4)
-			MeshKit.cyl(self, p + Vector3(0.3, h2 * 0.75, 0), 0.03, 0.06, h2 * 0.5, Color("1e1816"), 4).rotation.z = -0.8)
+			_prop(6, p, minf(_rng.randf_range(2.0, 3.6), mh)))
 	# Lava rivers
 	for river in range(3):
 		var a0: float = _rng.randf() * TAU
@@ -244,23 +225,29 @@ func _snow() -> void:
 			var h: float = minf(_rng.randf_range(0.8, 2.4), mh)
 			MeshKit.cyl(self, p + Vector3(0, h * 0.5, 0), 0.04, _rng.randf_range(0.25, 0.5), h, Color("a8d8ec"), 4, 0.25).rotation.z = _rng.randf_range(-0.3, 0.3)
 		else: _rock(p, _rng.randf_range(0.6, 1.6), Color("dfe8ee")))
-	MeshKit.plane(self, Vector2(10, 7), Vector3(15, GROUND_Y + 0.03, 6), Color("a8cede"), 0.2)
+	var lake: MeshInstance3D = MeshKit.plane(self, Vector2(10, 7), Vector3(15, GROUND_Y + 0.03, 6), Color("a8cede"), 0.2)
+	lake.material_override = _water_material()
 	MeshKit.particles(self, Vector3(0, 8, 0), Color("ffffff"), 120, Vector3(22, 1, 22), Vector3(0.3, -1.2, 0.2), 0.14, 9.0)
 
 func _lanterns() -> void:
-	for corner in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
-		var p := Vector3(corner.x * (PLATEAU_HALF + 0.9), GROUND_Y, corner.y * (PLATEAU_HALF + 0.9))
-		MeshKit.cyl(self, p + Vector3(0, 1.9, 0), 0.09, 0.13, 3.8, Color("4a3424"), 5)
-		MeshKit.box(self, Vector3(0.7, 0.08, 0.08), p + Vector3(0, 3.7, 0), Color("4a3424"))
-		var lamp: MeshInstance3D = MeshKit.ball(self, p + Vector3(0.3, 3.4, 0), Vector3(0.36, 0.44, 0.36), Color("ffcf6b"), 6, 4, 2.4)
+	for corner: Vector2 in [Vector2(-1,-1),Vector2(1,-1),Vector2(1,1),Vector2(-1,1)]:
+		var p := Vector3(corner.x * (PLATEAU_HALF + 0.7), GROUND_Y, corner.y * (PLATEAU_HALF + 0.7))
+		MeshKit.box(self, Vector3(0.18,3.1,0.18), p+Vector3(0,1.55,0), Color("243244"))
+		MeshKit.box(self, Vector3(0.64,0.1,0.52), p+Vector3(0,3.28,0), Color("344359"))
+		MeshKit.box(self, Vector3(0.54,0.1,0.48), p+Vector3(0,2.55,0), Color("1c2439"))
+		var lamp: MeshInstance3D = MeshKit.box(self, Vector3(0.34,0.62,0.30), p+Vector3(0,2.92,0), Color("ff9e48"), 0.85)
 		lamp.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		var l := OmniLight3D.new()
-		l.light_color = Color("ffc070")
-		l.omni_range = 7.5
-		l.light_energy = 1.1
-		l.position = p + Vector3(0.3, 3.2, 0)
-		add_child(l)
-		_flicker.append([l, 1.1, _rng.randf() * TAU])
+		for x: float in [-0.22,0.22]:
+			for z: float in [-0.20,0.20]: MeshKit.box(self, Vector3(0.055,0.72,0.055), p+Vector3(x,2.92,z), Color("29364b"))
+		var light := OmniLight3D.new()
+		light.position = p+Vector3(0,3.0,0)
+		light.light_color = Color("ffc087")
+		light.light_energy = 2.2
+		light.omni_range = 9.0
+		add_child(light)
+		_flicker.append([light,2.2,_rng.randf()*TAU])
+		_glow(p+Vector3(0,2.94,0),Vector2(2.4,2.4),Color(1.0,0.52,0.22,0.30),false)
+		_glow(p+Vector3(0,0.06,0),Vector2(5.5,5.5),Color(1.0,0.44,0.16,0.12),false,true)
 
 func _pulse_add(mi: MeshInstance3D, base: float, speed: float) -> void:
 	var m: StandardMaterial3D = mi.material_override.duplicate()
@@ -275,11 +262,11 @@ func set_weather(effect_id: String) -> void:
 		"rain": _weather("rain", Color("9fc0d8"), 220, Vector3(0.2, -9.0, 0.1), 0.08, 1.4)
 		"firefly_swarm": _weather("fireflies", Color("f0f07a"), 80, Vector3(0, 0.3, 0), 0.2, 5.0, 2.0, 2.0)
 		"sandstorm": _weather("sand", Color("d9a86a"), 260, Vector3(6.0, 0.2, 1.5), 0.3, 3.0)
-		"heatwave": sun.light_energy = 1.4
+		"heatwave": sun.light_energy = 0.9
 		"ash_fall": _weather("ash", Color("9a9090"), 160, Vector3(0.2, -1.0, 0.1), 0.18, 7.0)
 		"eruption": _weather("embers", Color("ff7a3c"), 140, Vector3(0, 3.0, 0), 0.16, 3.0, 2.5, -1.0)
 		"blizzard": _weather("blizzard", Color("ffffff"), 300, Vector3(5.0, -2.5, 1.0), 0.16, 3.0)
-		"clear_thaw": sun.light_energy = 1.35
+		"clear_thaw": sun.light_energy = 0.85
 
 func _weather(key: String, color: Color, amount: int, vel: Vector3, size: float, life: float, emission: float = 0.0, height: float = 8.0) -> void:
 	if not _weather_nodes.has(key):
@@ -300,3 +287,102 @@ func _process(delta: float) -> void:
 	for p: Array in _pulse:
 		var m: StandardMaterial3D = p[0]
 		m.emission_energy_multiplier = float(p[1]) * (0.75 + 0.25 * sin(_t * float(p[2])))
+
+func _prop(index: int, pos: Vector3, height: float) -> void:
+	if _atlas == null: _atlas = load("res://assets/environment/props_hd.png")
+	var regions: Array[Rect2] = [Rect2(0,0,320,625),Rect2(340,170,265,430),Rect2(620,75,320,525),Rect2(940,0,340,630),Rect2(0,680,375,500),Rect2(330,760,315,425),Rect2(645,710,295,475),Rect2(935,750,345,440)]
+	var region: Rect2 = regions[index]
+	var ratio: Vector2 = Vector2(_atlas.get_size()) / 1280.0
+	region.position *= ratio
+	region.size *= ratio
+	var tex := AtlasTexture.new()
+	tex.atlas = _atlas
+	tex.region = region
+	tex.filter_clip = true
+	var sprite := Sprite3D.new()
+	sprite.texture = tex
+	sprite.pixel_size = height / region.size.y
+	sprite.offset.y = region.size.y * 0.5
+	sprite.position = pos
+	sprite.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_OPAQUE_PREPASS
+	sprite.shaded = false
+	sprite.modulate = Color(0.82,0.88,0.98)
+	add_child(sprite)
+	var shadow: MeshInstance3D = MeshKit.plane(self, Vector2(height*0.7,height*0.45),pos+Vector3(0,0.04,0),Color(0.015,0.025,0.05,0.48))
+	shadow.material_override = shadow.material_override.duplicate()
+	shadow.material_override.albedo_texture = MeshKit._soft_dot()
+
+func _surface_texture() -> Texture2D:
+	if _surface_textures.has(biome): return _surface_textures[biome]
+	var image := Image.create(128,128,false,Image.FORMAT_RGBA8)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(biome+"pixel-surface")
+	for y in range(128):
+		for x in range(128):
+			var n: float = 0.83 + sin(float(x) * TAU / 32.0) * sin(float(y) * TAU / 64.0) * 0.10 + rng.randf_range(-0.025,0.025)
+			if rng.randf() < 0.02: n *= 0.88
+			var col := Color(n*0.84,n*0.91,n,1)
+			if biome == "forest" and sin(float(x)*0.1)*cos(float(y)*0.12) > 0.72: col = Color(n*0.72,n*0.85,n*0.78)
+			image.set_pixel(x,y,col)
+	var texture := ImageTexture.create_from_image(image)
+	_surface_textures[biome] = texture
+	return texture
+
+func _paint_environment(root: Node) -> void:
+	for child: Node in root.get_children():
+		if child is MeshInstance3D and child.material_override is StandardMaterial3D:
+			var current: StandardMaterial3D = child.material_override
+			if current.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED and not current.emission_enabled:
+				var material: StandardMaterial3D = current.duplicate()
+				material.albedo_texture = _surface_texture()
+				material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+				var bounds: Vector3 = child.mesh.get_aabb().size
+				var repeats: float = maxf(maxf(bounds.x,bounds.y),bounds.z) * 0.18
+				material.uv1_scale = Vector3(repeats,repeats,1)
+				material.roughness = 0.92
+				child.material_override = material
+		_paint_environment(child)
+
+func _water_material() -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = load("res://assets/shaders/environment_water.gdshader")
+	material.set_shader_parameter("deep_color",Color("10283e") if biome != "snow" else Color("243a58"))
+	material.set_shader_parameter("reflection_color",Color("b270a5") if biome != "snow" else Color("899dcc"))
+	return material
+
+func _glow(pos: Vector3, size: Vector2, color: Color, beam: bool, horizontal: bool = false) -> void:
+	var node := MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = size
+	node.mesh = quad
+	var material := ShaderMaterial.new()
+	material.shader = load("res://assets/shaders/environment_glow.gdshader")
+	material.set_shader_parameter("glow_color",color)
+	material.set_shader_parameter("beam",beam)
+	node.material_override = material
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	node.position = pos
+	node.rotation = Vector3(-PI*0.5,0,0) if horizontal else Vector3(-0.45,PI*0.25,0)
+	add_child(node)
+
+func _atmosphere() -> void:
+	var rim := DirectionalLight3D.new()
+	rim.light_color = Color("bd8bb8") if biome != "volcano" else Color("ca756c")
+	rim.light_energy = 0.20
+	rim.rotation_degrees = Vector3(-18,145,0)
+	add_child(rim)
+	for i in range(4):
+		var p := Vector3(-14+i*8,7.0,-15)
+		_glow(p,Vector2(3.4,15.0),Color(0.38,0.60,0.82,0.11),true)
+	var layer := CanvasLayer.new()
+	layer.layer = 1
+	add_child(layer)
+	var rect := ColorRect.new()
+	rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var grade := ShaderMaterial.new()
+	grade.shader = load("res://assets/shaders/environment_grade.gdshader")
+	rect.material = grade
+	layer.add_child(rect)

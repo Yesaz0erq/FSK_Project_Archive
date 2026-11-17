@@ -17,3 +17,4 @@
 /tools/apply_map.cjs
 /tools/update_*.cjs
 /tools/tide_visual.cjs
+/tools/restyle_environment.cjs

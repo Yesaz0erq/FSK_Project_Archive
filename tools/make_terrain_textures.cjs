@@ -1,14 +1,1 @@
-const fs=require('fs');fs.mkdirSync('assets/terrain',{recursive:true});
-const specs={sheet_sand:['#cdb56b','#85613d',['#ddc782','#bda15c','#eed68a']],sheet_grass:['#9ca53e','#6d5631',['#bac650','#7e8c32','#ced569']],sheet_burnt:['#454041','#413331',['#65524b','#302c31','#84634e']],sheet_river:['#3b7796','#4d6061',['#5796ae','#32617d','#7bb1bc']],sheet_riverbed:['#927a57','#69523d',['#ad9873','#746750','#c2b18d']],sheet_oasis:['#67934d','#766139',['#91aa53','#4c7e48','#b1bf64']]};
-for(const[id,[base,side,palette]]of Object.entries(specs)){
- let state=42+id.length;const rand=n=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state%n};const rect=(x,y,w,h,c)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`;
- let top=rect(0,0,128,128,base);for(let i=0;i<310;i++)top+=rect(rand(126),rand(126),1+rand(5),1+rand(3),palette[rand(3)]);
- if(id==='sheet_sand')for(let i=0;i<12;i++){const y=rand(125);top+=`<path d="M0 ${y} Q35 ${y-12} 65 ${y} T128 ${y+2}" fill="none" stroke="#e9d58c" stroke-width="2"/>`}
- if(id==='sheet_grass'||id==='sheet_oasis'){for(let i=0;i<20;i++){let x=rand(120)+4,y=rand(120)+4;top+=rect(x,y,2,5,'#536c2b')+rect(x-2,y-2,5,3,i%3===0?'#e9e6b2':'#b7c04e')}for(let i=0;i<8;i++)top+=rect(rand(116),rand(116),7+rand(6),4+rand(5),'#7b673b')}
- if(id==='sheet_burnt'||id==='sheet_riverbed'){for(let i=0;i<17;i++){let x=rand(128),y=rand(128);top+=`<path d="M${x} ${y} l-9 5 3 7 -13 4" fill="none" stroke="${id==='sheet_burnt'?'#231f26':'#514635'}" stroke-width="2"/>`}for(let i=0;i<20;i++)top+=`<ellipse cx="${rand(124)}" cy="${rand(124)}" rx="${2+rand(4)}" ry="${2+rand(3)}" fill="${palette[rand(3)]}"/>`}
- if(id==='sheet_river')for(let i=0;i<22;i++)top+=rect(rand(118),rand(125),6+rand(16),1,'#94c5cb');
- if(id==='sheet_oasis')top+='<path d="M30 42 Q55 19 89 43 Q114 68 88 91 Q48 109 29 82 Q17 60 30 42Z" fill="#c2bd79"/><path d="M35 45 Q57 28 86 47 Q104 67 83 86 Q50 99 34 78 Q24 61 35 45Z" fill="#3f8b9b"/><path d="M40 54 Q62 40 82 54 M46 78 Q63 86 80 74" fill="none" stroke="#97c8bc" stroke-width="2"/>';
- let sides=rect(0,0,128,128,side);for(let layer=0;layer<8;layer++){let y=layer*16;let c=layer%2?'#71583c':'#8e7148';if(id==='sheet_burnt')c=layer%2?'#3b3030':'#56413a';if(id==='sheet_river')c=layer%2?'#45545a':'#5e6c69';sides+=`<path d="M0 ${y} L16 ${y+3} 34 ${y-2} 56 ${y+4} 79 ${y} 101 ${y+3} 128 ${y-1} V${y+9} H0Z" fill="${c}"/>`}
- for(let i=0;i<160;i++)sides+=rect(rand(127),rand(124)+4,1+rand(5),1+rand(3),i%2?'#a18a61':'#4c4234');sides+=rect(0,0,128,12,base);for(let x=0;x<128;x+=4)sides+=rect(x,8,4,3+rand(15),base);for(let i=0;i<55;i++)sides+=rect(rand(127),rand(9),2,2,palette[rand(3)]);
- for(const[type,body]of [['top',top],['side',sides]])fs.writeFileSync(`assets/terrain/${id}_${type}.svg`,`<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" shape-rendering="crispEdges">${body}</svg>`);
-}
+require('./make_terrain_textures_hd.cjs');

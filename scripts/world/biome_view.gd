@@ -4,6 +4,7 @@ extends Node3D
 
 signal hovered(cell: Vector2i)
 signal clicked(cell: Vector2i, button: int)
+signal context_requested(cell: Vector2i, point: Vector2)
 
 const TILE: float = 1.6
 const GRID: int = 11
@@ -119,7 +120,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed: _zoom_target = clampf(_zoom_target - 1.5 * Settings.camera_speed, 9.0, 32.0)
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed: _zoom_target = clampf(_zoom_target + 1.5 * Settings.camera_speed, 9.0, 32.0)
 		elif mb.button_index == MOUSE_BUTTON_MIDDLE: _dragging = mb.pressed
-		elif mb.pressed and (mb.button_index == MOUSE_BUTTON_LEFT or mb.button_index == MOUSE_BUTTON_RIGHT):
+		elif mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
+			context_requested.emit(_pick(mb.position), mb.position)
+			get_viewport().set_input_as_handled()
+		elif mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
 			var c: Vector2i = _pick(mb.position)
 			clicked.emit(c, mb.button_index)
 	elif event is InputEventMouseMotion:
@@ -533,7 +537,7 @@ func _process(delta: float) -> void:
 	for tween: Tween in _tide_tweens.values():
 		tween.set_speed_scale(0.0 if Sim.paused else Sim.time_scale)
 	_t += delta
-	if showcase: _yaw_target += delta * 4.0
+	if showcase: _yaw_target += delta * 0.6
 	_yaw = lerpf(_yaw, _yaw_target, minf(1.0, delta * 6.0))
 	_zoom = lerpf(_zoom, _zoom_target, minf(1.0, delta * 8.0))
 	_apply_camera()
