@@ -107,7 +107,6 @@
   "Normal": "普通",
   "Temp": "温度",
   "Effects": "效果",
-  "NEO CURRENCY": "新生货币",
   "Day 1 · 00:00": "第1天 · 00:00",
   "Funds": "资金",
   "Reputation": "声望",
@@ -307,5 +306,6 @@
   "South": "南",
   "Tide interval (0 = manual)": "潮汐间隔秒数（0为手动）",
   "Gather Life and Ember.\nFuse nature through Silence; record and reshape through Eternity.": "规划地块，汇聚生灵与余烬。\n以静默融合自然，以永恒记录与重塑。",
-  "Plots have a base class, variant and level. Life and Ember are natural energies; Silence and Eternity are artificial technologies. Tides replenish or draw energy, then trigger paired flips or transformations between different variants of the same base class and level. Heat and moisture determine temperature independently.": "地块由基础类型与变体组成。生灵、余烬是自然能量，静默、永恒是人工技术。潮汐补充或抽离自然能量，并触发成对翻转或同基础同等级转变。温度由热度与湿度独立决定。"
+  "Plots have a base class, variant and level. Life and Ember are natural energies; Silence and Eternity are artificial technologies. Tides replenish or draw energy, then trigger paired flips or transformations between different variants of the same base class and level. Heat and moisture determine temperature independently.": "地块由基础类型与变体组成。生灵、余烬是自然能量，静默、永恒是人工技术。潮汐补充或抽离自然能量，并触发成对翻转或同基础同等级转变。温度由热度与湿度独立决定。",
+  "Project Archive": "归档计划"
 }

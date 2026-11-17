@@ -75,7 +75,7 @@ func _build_top_bar() -> void:
 	p.add_child(h)
 	var logo := VBoxContainer.new()
 	logo.add_theme_constant_override("separation", -4)
-	logo.add_child(UITheme.label(tr("NEO CURRENCY"), 22, UITheme.BRASS, true))
+	logo.add_child(UITheme.label(tr("Project Archive"), 22, UITheme.BRASS, true))
 	_clock = UITheme.label(tr("Day 1 · 00:00"), 12, UITheme.MUTED)
 	logo.add_child(_clock)
 	h.add_child(logo)

@@ -27,7 +27,7 @@ func _ready() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	p.add_child(v)
-	v.add_child(UITheme.label(tr("NEO CURRENCY"), 44, UITheme.BRASS, true))
+	v.add_child(UITheme.label(tr("Project Archive"), 44, UITheme.BRASS, true))
 	var sub := UITheme.label(tr("Gather Life and Ember.\nFuse nature through Silence; record and reshape through Eternity."), 14, UITheme.MUTED)
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	sub.custom_minimum_size = Vector2(360, 0)

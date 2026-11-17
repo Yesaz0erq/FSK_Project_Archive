@@ -32,6 +32,7 @@ func _ready() -> void:
 
 func apply_display() -> void:
 	TranslationServer.set_locale(language)
+	DisplayServer.window_set_title(tr("Project Archive"))
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED)
 

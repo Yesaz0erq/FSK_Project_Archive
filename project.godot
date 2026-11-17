@@ -10,8 +10,8 @@ config_version=5
 
 [application]
 
-config/name="Neo Currency"
-config/description="A 2.5D resource management and space planning simulation. Plant-machines on 11x11 plots across four biomes."
+config/name="Project Archive"
+config/description="归档计划 / Project Archive：汇聚生灵与余烬，以静默融合自然，以永恒记录与重塑的地块经营游戏。"
 run/main_scene="res://scenes/title.tscn"
 config/use_custom_user_dir=true
 config/custom_user_dir_name="NeoCurrency"
