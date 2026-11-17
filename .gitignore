@@ -1,0 +1,19 @@
+.godot/
+/builds/
+/android/
+.backup-before-*/
+*.log
+
+# Local change history and superseded screenshots.
+/docs/*
+!/docs/.gdignore
+!/docs/world-terms-preview.png
+!/docs/terrain-models-preview.png
+
+# One-time migration helpers; retain the reusable asset generators.
+/tools/add_*.cjs
+/tools/finish_*.cjs
+/tools/wire_*.cjs
+/tools/apply_map.cjs
+/tools/update_*.cjs
+/tools/tide_visual.cjs

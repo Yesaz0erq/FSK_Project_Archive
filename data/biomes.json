@@ -1,0 +1,38 @@
+{
+  "_doc": "Scenes. land_weights drive seed generation; deposits = how many deposit plots per resource; natural_effects = effect ids that may be bound by the seed; weather = timed scene-wide effects.",
+  "order": ["forest", "desert", "volcano", "snow"],
+  "biomes": {
+    "forest": {
+      "name": "Forest", "subtitle": "Mossgrove Hollow",
+      "land_weights": {"loam": 4, "moss_bog": 2, "old_root": 2, "river_bank": 2},
+      "deposits": {"timber": 3, "resin": 2, "water": 2},
+      "natural_effects": {"ley_line": 2, "mycelium_web": 3, "frost_bloom": 1, "geyser": 1},
+      "weather": ["rain", "firefly_swarm"],
+      "palette": {"sky_top": "#1E2A2E", "horizon": "#465F55", "ground": "#263A30", "cliff": "#3B3229", "fog": "#4C665A", "sun": "#F2D9A6", "ambient": "#5E7C76", "accent": "#C9E07A"}
+    },
+    "desert": {
+      "name": "Desert", "subtitle": "Saltglass Reach",
+      "land_weights": {"dune": 4, "salt_flat": 2, "sandstone": 2, "oasis": 1},
+      "deposits": {"sand": 3, "salt": 2, "copper_ore": 3},
+      "natural_effects": {"mirage": 2, "ley_line": 1, "ember_seam": 2, "geyser": 1},
+      "weather": ["sandstorm", "heatwave"],
+      "palette": {"sky_top": "#3B2C3A", "horizon": "#C98B5E", "ground": "#8E6A47", "cliff": "#6A4632", "fog": "#B98A66", "sun": "#FFD9A0", "ambient": "#9C7D74", "accent": "#F2C46B"}
+    },
+    "volcano": {
+      "name": "Volcano", "subtitle": "Cinder Throat",
+      "land_weights": {"basalt": 3, "ash_field": 3, "lava_crust": 2, "sulfur_vent": 1},
+      "deposits": {"iron_ore": 3, "sulfur": 2, "obsidian": 2},
+      "natural_effects": {"ember_seam": 3, "sulfur_plume": 2, "geyser": 1},
+      "weather": ["ash_fall", "eruption"],
+      "palette": {"sky_top": "#1B1517", "horizon": "#5A2E25", "ground": "#2A2224", "cliff": "#1E191B", "fog": "#4A2B26", "sun": "#FFB27A", "ambient": "#7B5550", "accent": "#FF7A3C"}
+    },
+    "snow": {
+      "name": "Snowy Mountain", "subtitle": "Whitehorn Pass",
+      "land_weights": {"snowfield": 4, "permafrost": 2, "glacier": 2, "hot_spring": 1},
+      "deposits": {"ice": 3, "frost_quartz": 3, "water": 1},
+      "natural_effects": {"aurora": 2, "frost_bloom": 2, "geyser": 2, "ley_line": 1},
+      "weather": ["blizzard", "clear_thaw"],
+      "palette": {"sky_top": "#1C2433", "horizon": "#7D93A8", "ground": "#B5C3CC", "cliff": "#56636E", "fog": "#9DB0C0", "sun": "#E8F0FF", "ambient": "#8EA2B8", "accent": "#A8E0FF"}
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "_doc": "Order pool. min_rep gates when an order can appear. Open orders expire after 'time' seconds. Rewards: money and reputation.",
+  "slots": 4,
+  "orders": [
+    {"id": "firewood",     "customer": "Moss-hat Hermit",      "name": "Firewood for winter", "needs": {"timber": 6},                      "reward": 40,  "rep": 1, "time": 240, "min_rep": 0},
+    {"id": "dew_jars",     "customer": "Beetle Postman",       "name": "Jars of dew",         "needs": {"water": 8},                       "reward": 30,  "rep": 1, "time": 240, "min_rep": 0},
+    {"id": "salt_cellar",  "customer": "Salt Moth Inn",        "name": "Salt for the cellar", "needs": {"salt": 5},                        "reward": 50,  "rep": 1, "time": 260, "min_rep": 0},
+    {"id": "sand_bags",    "customer": "Dune Snail Caravan",   "name": "Ballast sand",        "needs": {"sand": 8},                        "reward": 35,  "rep": 1, "time": 240, "min_rep": 0},
+    {"id": "coal_sack",    "customer": "Chimney Owl",          "name": "Sack of charcoal",    "needs": {"charcoal": 6},                    "reward": 60,  "rep": 1, "time": 260, "min_rep": 0},
+    {"id": "ore_sample",   "customer": "Rock Collector",       "name": "Ore samples",         "needs": {"iron_ore": 4, "copper_ore": 4},   "reward": 80,  "rep": 2, "time": 300, "min_rep": 1},
+    {"id": "ice_block",    "customer": "Fishmonger Toad",      "name": "Ice blocks",          "needs": {"ice": 6},                         "reward": 45,  "rep": 1, "time": 240, "min_rep": 1},
+    {"id": "glass_panes",  "customer": "Greenhouse Keeper",    "name": "Greenhouse panes",    "needs": {"glass": 4},                       "reward": 110, "rep": 2, "time": 300, "min_rep": 1},
+    {"id": "iron_bars",    "customer": "Tinker Crow",          "name": "Iron for the forge",  "needs": {"ingot": 4},                       "reward": 120, "rep": 2, "time": 300, "min_rep": 2},
+    {"id": "sulfur_pouch", "customer": "Firework Frog",        "name": "Sulfur pouches",      "needs": {"sulfur": 5},                      "reward": 70,  "rep": 1, "time": 260, "min_rep": 2},
+    {"id": "spore_basket", "customer": "Mushroom Choir",       "name": "Spore basket",        "needs": {"spore": 8, "resin": 2},           "reward": 90,  "rep": 2, "time": 300, "min_rep": 2},
+    {"id": "cog_set",      "customer": "Clock Tower Keeper",   "name": "Set of cogs",         "needs": {"cog": 3},                         "reward": 170, "rep": 3, "time": 360, "min_rep": 3},
+    {"id": "lens_pair",    "customer": "Stargazer Bat",        "name": "Pair of lenses",      "needs": {"lens": 2},                        "reward": 150, "rep": 3, "time": 360, "min_rep": 3},
+    {"id": "vine_spool",   "customer": "Telegraph Spider",     "name": "Spool of copper vine","needs": {"copper_wire": 6},                 "reward": 130, "rep": 2, "time": 320, "min_rep": 3},
+    {"id": "obsidian",     "customer": "Mirror Merchant",      "name": "Black glass",         "needs": {"obsidian": 4, "frost_quartz": 2}, "reward": 120, "rep": 2, "time": 320, "min_rep": 3},
+    {"id": "core_one",     "customer": "Airship Captain",      "name": "A Bloom Core",        "needs": {"bloom_core": 1},                  "reward": 380, "rep": 5, "time": 420, "min_rep": 7},
+    {"id": "core_three",   "customer": "The Great Clockwork",  "name": "Three Bloom Cores",   "needs": {"bloom_core": 3, "lens": 2},       "reward": 1300,"rep": 10,"time": 600, "min_rep": 10}
+  ]
+}

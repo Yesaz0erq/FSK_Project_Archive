@@ -1,0 +1,99 @@
+{
+  "_doc": "生灵、余烬为自然能量浓度；静默、永恒为人工技术作用强度，范围0至100。技术不在自然地块中随机生成。",
+  "elements": {
+    "life": {
+      "name": "生灵",
+      "color": "#9FCB70",
+      "glyph": "生",
+      "category": "自然能量",
+      "description": "一种自然能量，通常表现为植物，聚集足够浓度时可以分化出各种各样的植物组织。"
+    },
+    "ember": {
+      "name": "余烬",
+      "color": "#E77A48",
+      "glyph": "烬",
+      "category": "自然能量",
+      "description": "一种自然能量，通常表现为高温与火焰，聚集足够浓度时可以分化出各种各样的矿石与金属。"
+    },
+    "silence": {
+      "name": "静默",
+      "color": "#AF90D2",
+      "glyph": "静",
+      "category": "人工技术",
+      "description": "一种人工技术，通常表现为对生灵或余烬等自然能量的融合与诱变。"
+    },
+    "eternity": {
+      "name": "永恒",
+      "color": "#88C5DB",
+      "glyph": "恒",
+      "category": "人工技术",
+      "description": "一种人工技术，通常表现为记录某样事物的一切组成，使得其在合适时机能够被完整重塑。"
+    }
+  },
+  "stat_influence": {
+    "life": {
+      "speed": 0.08,
+      "yield": 0.25,
+      "energy": 0,
+      "wear": -0.1
+    },
+    "ember": {
+      "speed": 0.2,
+      "yield": 0.15,
+      "energy": -0.05,
+      "wear": 0.3
+    },
+    "silence": {
+      "speed": 0.1,
+      "yield": 0.2,
+      "energy": 0.1,
+      "wear": 0.05
+    },
+    "eternity": {
+      "speed": 0,
+      "yield": 0,
+      "energy": 0,
+      "wear": -0.35
+    }
+  },
+  "stats": {
+    "speed": {
+      "name": "Speed",
+      "description": "Work cycles per second, relative to base.",
+      "higher_is_better": true
+    },
+    "yield": {
+      "name": "Yield",
+      "description": "Output per cycle, relative to base.",
+      "higher_is_better": true
+    },
+    "energy": {
+      "name": "Energy",
+      "description": "Energy drawn while working, relative to base.",
+      "higher_is_better": false
+    },
+    "wear": {
+      "name": "Wear",
+      "description": "Wear gained per cycle. At 100 the machine jams.",
+      "higher_is_better": false
+    }
+  },
+  "stat_limits": {
+    "speed": [
+      0.2,
+      2.5
+    ],
+    "yield": [
+      0.3,
+      2.5
+    ],
+    "energy": [
+      0.3,
+      2.5
+    ],
+    "wear": [
+      0.2,
+      3
+    ]
+  }
+}

@@ -1,0 +1,487 @@
+{
+  "_doc": "Plant-machines. kind: extractor (must stand on a deposit, outputs the deposit's resource), producer, generator (energy_out per cycle), support (aura only). power = energy drawn per second while working. affinity scales how strongly each element moves this machine's stats (negative flips it). temperature: extra speed multiplier per temperature class (0 = cannot work). living machines multiply yield by (0.6 + 0.6 * fertility).",
+  "machines": {
+    "taproot_drill": {
+      "name": "Taproot Drill",
+      "kind": "extractor",
+      "cost": 60,
+      "materials": {
+        "timber": 2
+      },
+      "power": 1.5,
+      "wear": 3,
+      "unlock_rep": 0,
+      "living": false,
+      "description": "A gnarled taproot sheathed in a brass collar. It worms down into a deposit and hauls the goods up its veins.",
+      "recipes": [
+        {
+          "id": "extract",
+          "name": "Extract deposit",
+          "inputs": {},
+          "outputs": {},
+          "duration": 4
+        }
+      ],
+      "affinity": {
+        "life": 0.3,
+        "ember": 1.4,
+        "silence": 1,
+        "eternity": 1
+      },
+      "temperature": {
+        "freezing": 0.6
+      }
+    },
+    "pitcher_still": {
+      "name": "Pitcher Still",
+      "kind": "producer",
+      "cost": 45,
+      "materials": {
+        "timber": 1
+      },
+      "power": 0,
+      "wear": 1.5,
+      "unlock_rep": 0,
+      "living": true,
+      "description": "A giant pitcher plant on a copper stand. It drinks dew from the air and drips it through a little tap.",
+      "recipes": [
+        {
+          "id": "dew",
+          "name": "Gather dew",
+          "inputs": {},
+          "outputs": {
+            "water": 2
+          },
+          "duration": 6
+        }
+      ],
+      "affinity": {
+        "life": 1.5,
+        "ember": 0.25,
+        "silence": 1,
+        "eternity": 1
+      },
+      "temperature": {
+        "scorching": 0.35,
+        "freezing": 0
+      }
+    },
+    "leafwing_turbine": {
+      "name": "Leafwing Turbine",
+      "kind": "generator",
+      "cost": 70,
+      "materials": {
+        "timber": 3
+      },
+      "power": 0,
+      "wear": 2,
+      "unlock_rep": 0,
+      "living": true,
+      "aura": "leaf_draft",
+      "description": "Four great leaves on a bamboo stalk, spinning a dynamo made from an old tin can. Loves a strong wind.",
+      "recipes": [
+        {
+          "id": "draft",
+          "name": "Catch the wind",
+          "inputs": {},
+          "outputs": {},
+          "energy_out": 12,
+          "duration": 4
+        }
+      ],
+      "affinity": {
+        "life": 1.5,
+        "ember": 0.25,
+        "silence": 1,
+        "eternity": 1
+      },
+      "temperature": {}
+    },
+    "seedpod_kiln": {
+      "name": "Seedpod Kiln",
+      "kind": "producer",
+      "cost": 90,
+      "materials": {
+        "timber": 2,
+        "sand": 2
+      },
+      "power": 1,
+      "wear": 3.5,
+      "unlock_rep": 0,
+      "living": false,
+      "aura": "kiln_heat",
+      "description": "A baked clay seed pod with an iron door. It holds a fire that never quite goes out.",
+      "recipes": [
+        {
+          "id": "charcoal",
+          "name": "Char timber",
+          "inputs": {
+            "timber": 2
+          },
+          "outputs": {
+            "charcoal": 2
+          },
+          "duration": 5
+        },
+        {
+          "id": "ingot",
+          "name": "Smelt iron",
+          "inputs": {
+            "iron_ore": 2,
+            "charcoal": 1
+          },
+          "outputs": {
+            "ingot": 1
+          },
+          "duration": 7
+        },
+        {
+          "id": "glass",
+          "name": "Blow glass",
+          "inputs": {
+            "sand": 2,
+            "charcoal": 1
+          },
+          "outputs": {
+            "glass": 1
+          },
+          "duration": 6
+        },
+        {
+          "id": "obsidian_glass",
+          "name": "Melt obsidian",
+          "inputs": {
+            "obsidian": 1
+          },
+          "outputs": {
+            "glass": 2
+          },
+          "duration": 8
+        },
+        {
+          "id": "spore_char",
+          "name": "Char spore pods",
+          "inputs": {
+            "spore": 3
+          },
+          "outputs": {
+            "charcoal": 2
+          },
+          "duration": 6
+        },
+        {
+          "id": "ember_ore",
+          "name": "余烬分化：矿石",
+          "inputs": {
+            "ember": 2
+          },
+          "outputs": {
+            "iron_ore": 2,
+            "copper_ore": 1
+          },
+          "duration": 8
+        }
+      ],
+      "affinity": {
+        "life": 0.3,
+        "ember": 1.4,
+        "silence": 1,
+        "eternity": 1
+      },
+      "temperature": {
+        "freezing": 0.5
+      }
+    },
+    "spore_garden": {
+      "name": "Spore Garden",
+      "kind": "producer",
+      "cost": 80,
+      "materials": {
+        "timber": 2,
+        "water": 4
+      },
+      "power": 0,
+      "wear": 1,
+      "unlock_rep": 2,
+      "living": true,
+      "aura": "garden_spores",
+      "description": "A rusty bathtub full of puffball mushrooms, watered by a dripping pipe. Grows fuel pods and sticky resin.",
+      "recipes": [
+        {
+          "id": "spores",
+          "name": "Grow spore pods",
+          "inputs": {
+            "water": 1
+          },
+          "outputs": {
+            "spore": 2
+          },
+          "duration": 8
+        },
+        {
+          "id": "resin",
+          "name": "Weep resin",
+          "inputs": {
+            "water": 2
+          },
+          "outputs": {
+            "resin": 1
+          },
+          "duration": 9
+        },
+        {
+          "id": "life_tissue",
+          "name": "生灵分化：植物组织",
+          "inputs": {
+            "life": 2
+          },
+          "outputs": {
+            "timber": 3,
+            "resin": 1
+          },
+          "duration": 8
+        }
+      ],
+      "affinity": {
+        "life": 1.5,
+        "ember": 0.25,
+        "silence": 1,
+        "eternity": 1
+      },
+      "temperature": {
+        "scorching": 0.3,
+        "freezing": 0.2,
+        "cold": 0.7
+      }
+    },
+    "vine_loom": {
+      "name": "Vine Loom",
+      "kind": "producer",
+      "cost": 140,
+      "materials": {
+        "timber": 4,
+        "ingot": 1
+      },
+      "power": 2.5,
+      "wear": 2.5,
+      "unlock_rep": 3,
+      "living": true,
+      "description": "运用静默技术融合与诱变自然能量，编织植物组织和金属部件，并向周围提供静默融合场。",
+      "recipes": [
+        {
+          "id": "cog",
+          "name": "Carve cog",
+          "inputs": {
+            "ingot": 1,
+            "timber": 2
+          },
+          "outputs": {
+            "cog": 1
+          },
+          "duration": 8
+        },
+        {
+          "id": "wire",
+          "name": "Twist copper vine",
+          "inputs": {
+            "copper_ore": 2
+          },
+          "outputs": {
+            "copper_wire": 2
+          },
+          "duration": 6
+        },
+        {
+          "id": "lens",
+          "name": "Polish dew lens",
+          "inputs": {
+            "glass": 1,
+            "salt": 1
+          },
+          "outputs": {
+            "lens": 1
+          },
+          "duration": 9
+        },
+        {
+          "id": "frost_lens",
+          "name": "Grind frost lens",
+          "inputs": {
+            "frost_quartz": 2
+          },
+          "outputs": {
+            "lens": 1
+          },
+          "duration": 10
+        },
+        {
+          "id": "silence_fusion",
+          "name": "静默：自然能量融合",
+          "inputs": {
+            "life": 1,
+            "ember": 1
+          },
+          "outputs": {
+            "copper_wire": 2
+          },
+          "duration": 9
+        }
+      ],
+      "affinity": {
+        "life": 1.5,
+        "ember": 0.25,
+        "silence": 1,
+        "eternity": 1
+      },
+      "temperature": {
+        "freezing": 0.6
+      },
+      "aura": "silence_field"
+    },
+    "gourd_kettle": {
+      "name": "Gourd Kettle",
+      "kind": "generator",
+      "cost": 130,
+      "materials": {
+        "timber": 2,
+        "ingot": 2
+      },
+      "power": 0,
+      "wear": 3,
+      "unlock_rep": 4,
+      "living": true,
+      "description": "A huge dried gourd strapped with iron bands. Boils water on ground heat and whistles power down a reed pipe.",
+      "recipes": [
+        {
+          "id": "boil",
+          "name": "Boil water",
+          "inputs": {
+            "water": 1
+          },
+          "outputs": {},
+          "energy_out": 30,
+          "duration": 5
+        },
+        {
+          "id": "thaw",
+          "name": "Melt ice",
+          "inputs": {
+            "ice": 1
+          },
+          "outputs": {},
+          "energy_out": 24,
+          "duration": 5
+        },
+        {
+          "id": "sulfur",
+          "name": "Burn sulfur",
+          "inputs": {
+            "sulfur": 1,
+            "water": 1
+          },
+          "outputs": {},
+          "energy_out": 55,
+          "duration": 6
+        }
+      ],
+      "affinity": {
+        "life": 1.5,
+        "ember": 0.25,
+        "silence": 1,
+        "eternity": 1
+      },
+      "temperature": {
+        "freezing": 0.4,
+        "cold": 0.7
+      }
+    },
+    "ember_lily": {
+      "name": "Ember Lily",
+      "kind": "support",
+      "cost": 75,
+      "materials": {
+        "resin": 2,
+        "sulfur": 1
+      },
+      "power": 0.6,
+      "wear": 0,
+      "unlock_rep": 2,
+      "living": true,
+      "aura": "lily_warmth",
+      "description": "A glowing lily in a lantern cage. Warms every plot next to it.",
+      "recipes": [],
+      "affinity": {
+        "life": 1.5,
+        "ember": 0.25,
+        "silence": 1,
+        "eternity": 1
+      },
+      "temperature": {}
+    },
+    "mist_fern": {
+      "name": "Mist Fern",
+      "kind": "support",
+      "cost": 75,
+      "materials": {
+        "timber": 1,
+        "water": 6
+      },
+      "power": 0.6,
+      "wear": 0,
+      "unlock_rep": 2,
+      "living": true,
+      "aura": "fern_mist",
+      "description": "A tall fern with a bellows heart. It sighs cool mist over the plots next to it.",
+      "recipes": [],
+      "affinity": {
+        "life": 1.5,
+        "ember": 0.25,
+        "silence": 1,
+        "eternity": 1
+      },
+      "temperature": {}
+    },
+    "bloom_press": {
+      "name": "Bloom Press",
+      "kind": "producer",
+      "cost": 260,
+      "materials": {
+        "cog": 2,
+        "lens": 1,
+        "ingot": 2
+      },
+      "power": 5,
+      "wear": 4,
+      "unlock_rep": 7,
+      "living": true,
+      "description": "运用永恒技术记录事物组成，支持周围地块记录与完整重塑，同时保持花核压制能力。",
+      "recipes": [
+        {
+          "id": "core",
+          "name": "Press a bloom core",
+          "inputs": {
+            "cog": 2,
+            "lens": 1,
+            "copper_wire": 2,
+            "resin": 1
+          },
+          "outputs": {
+            "bloom_core": 1
+          },
+          "duration": 16
+        }
+      ],
+      "affinity": {
+        "life": 1.5,
+        "ember": 0.25,
+        "silence": 1,
+        "eternity": 1
+      },
+      "temperature": {
+        "freezing": 0.5,
+        "scorching": 0.7
+      },
+      "aura": "eternity_field"
+    }
+  }
+}

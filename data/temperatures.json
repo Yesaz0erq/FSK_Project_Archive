@@ -1,0 +1,19 @@
+{
+  "_doc": "Temperature class is derived from a plot's current Fire and Water. Rules are tested in order; the first match wins. Each class multiplies machine stats.",
+  "rules": [
+    {"class": "freezing",  "fire_below": 15},
+    {"class": "cold",      "fire_below": 35},
+    {"class": "scorching", "fire_at_least": 80},
+    {"class": "humid",     "water_at_least": 45},
+    {"class": "hot",       "fire_at_least": 60},
+    {"class": "dry"}
+  ],
+  "classes": {
+    "scorching": {"name": "Scorching", "color": "#E4572E", "stats": {"speed": 1.15, "yield": 1.00, "energy": 0.90, "wear": 1.50}, "description": "Blistering ground. Fast, brutal on parts."},
+    "hot":       {"name": "Hot",       "color": "#E89A4B", "stats": {"speed": 1.08, "yield": 1.00, "energy": 0.95, "wear": 1.15}, "description": "Warm and quick."},
+    "humid":     {"name": "Humid",     "color": "#6FAE8F", "stats": {"speed": 1.00, "yield": 1.10, "energy": 1.05, "wear": 1.10}, "description": "Damp air. Good harvests, slow rust."},
+    "dry":       {"name": "Dry",       "color": "#C9B27A", "stats": {"speed": 1.00, "yield": 0.95, "energy": 1.00, "wear": 0.90}, "description": "Mild and dusty. Gentle on machines."},
+    "cold":      {"name": "Cold",      "color": "#8DB6D1", "stats": {"speed": 0.90, "yield": 1.00, "energy": 1.10, "wear": 0.85}, "description": "Stiff joints, long-lived parts."},
+    "freezing":  {"name": "Freezing",  "color": "#CFE6F2", "stats": {"speed": 0.70, "yield": 1.00, "energy": 1.25, "wear": 0.80}, "description": "Everything slows. Liquids freeze."}
+  }
+}

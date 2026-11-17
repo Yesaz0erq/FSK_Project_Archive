@@ -1,0 +1,633 @@
+{
+  "_doc": "Land types. Every plot inherits these base values. Seed generation adds a small jitter, and bound effects modify the result. elements: 0-100. richness scales extractor yield, stability lowers wear, conductivity lowers energy draw, fertility feeds living machines. resources: weights for deposits placed on this land type.",
+  "land_types": {
+    "loam": {
+      "biome": "forest",
+      "name": "Loam Meadow",
+      "color": "#566E47",
+      "height": 0,
+      "elements": {
+        "life": 64,
+        "ember": 45,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1,
+      "stability": 0.7,
+      "conductivity": 1,
+      "fertility": 0.8,
+      "resources": {
+        "timber": 3,
+        "resin": 1
+      },
+      "environment": {
+        "heat": 45,
+        "moisture": 58
+      }
+    },
+    "moss_bog": {
+      "biome": "forest",
+      "name": "Moss Bog",
+      "color": "#3F5E4B",
+      "height": -0.08,
+      "elements": {
+        "life": 80,
+        "ember": 32,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 0.9,
+      "stability": 0.45,
+      "conductivity": 1.1,
+      "fertility": 1,
+      "resources": {
+        "water": 3,
+        "resin": 1
+      },
+      "environment": {
+        "heat": 32,
+        "moisture": 85
+      }
+    },
+    "old_root": {
+      "biome": "forest",
+      "name": "Old Root Hollow",
+      "color": "#5E4E38",
+      "height": 0.1,
+      "elements": {
+        "life": 56,
+        "ember": 42,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1.2,
+      "stability": 0.85,
+      "conductivity": 0.9,
+      "fertility": 0.7,
+      "resources": {
+        "timber": 2,
+        "resin": 3
+      },
+      "environment": {
+        "heat": 42,
+        "moisture": 38
+      }
+    },
+    "river_bank": {
+      "biome": "forest",
+      "name": "River Bank",
+      "color": "#4F6F6B",
+      "height": -0.04,
+      "elements": {
+        "life": 72,
+        "ember": 40,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1,
+      "stability": 0.6,
+      "conductivity": 1.2,
+      "fertility": 0.9,
+      "resources": {
+        "water": 4
+      },
+      "environment": {
+        "heat": 40,
+        "moisture": 75
+      }
+    },
+    "dune": {
+      "biome": "desert",
+      "name": "Dune Sand",
+      "color": "#B8925C",
+      "height": 0,
+      "elements": {
+        "life": 8,
+        "ember": 78,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 0.9,
+      "stability": 0.4,
+      "conductivity": 0.9,
+      "fertility": 0.1,
+      "resources": {
+        "sand": 4
+      },
+      "environment": {
+        "heat": 78,
+        "moisture": 10
+      }
+    },
+    "salt_flat": {
+      "biome": "desert",
+      "name": "Salt Flat",
+      "color": "#C9BC9F",
+      "height": -0.03,
+      "elements": {
+        "life": 0,
+        "ember": 52,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1.1,
+      "stability": 0.8,
+      "conductivity": 1.3,
+      "fertility": 0,
+      "resources": {
+        "salt": 4
+      },
+      "environment": {
+        "heat": 52,
+        "moisture": 22
+      }
+    },
+    "sandstone": {
+      "biome": "desert",
+      "name": "Sandstone Shelf",
+      "color": "#B07A52",
+      "height": 0.12,
+      "elements": {
+        "life": 8,
+        "ember": 56,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1.2,
+      "stability": 0.9,
+      "conductivity": 1,
+      "fertility": 0.1,
+      "resources": {
+        "copper_ore": 4,
+        "sand": 1
+      },
+      "environment": {
+        "heat": 56,
+        "moisture": 14
+      }
+    },
+    "oasis": {
+      "biome": "desert",
+      "name": "Oasis Silt",
+      "color": "#6F8C62",
+      "height": -0.06,
+      "elements": {
+        "life": 72,
+        "ember": 60,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1,
+      "stability": 0.6,
+      "conductivity": 1,
+      "fertility": 0.9,
+      "resources": {
+        "water": 3
+      },
+      "environment": {
+        "heat": 60,
+        "moisture": 70
+      }
+    },
+    "basalt": {
+      "biome": "volcano",
+      "name": "Basalt Plate",
+      "color": "#4A4246",
+      "height": 0.08,
+      "elements": {
+        "life": 8,
+        "ember": 70,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1.2,
+      "stability": 0.9,
+      "conductivity": 1.1,
+      "fertility": 0.1,
+      "resources": {
+        "iron_ore": 4,
+        "obsidian": 1
+      },
+      "environment": {
+        "heat": 70,
+        "moisture": 15
+      }
+    },
+    "ash_field": {
+      "biome": "volcano",
+      "name": "Ash Field",
+      "color": "#6D6464",
+      "height": 0,
+      "elements": {
+        "life": 40,
+        "ember": 57,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1,
+      "stability": 0.5,
+      "conductivity": 0.8,
+      "fertility": 0.5,
+      "resources": {
+        "iron_ore": 2,
+        "sulfur": 1
+      },
+      "environment": {
+        "heat": 57,
+        "moisture": 25
+      }
+    },
+    "lava_crust": {
+      "biome": "volcano",
+      "name": "Lava Crust",
+      "color": "#7A3B2C",
+      "height": 0.04,
+      "elements": {
+        "life": 0,
+        "ember": 95,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1.3,
+      "stability": 0.3,
+      "conductivity": 1.2,
+      "fertility": 0,
+      "resources": {
+        "obsidian": 4
+      },
+      "environment": {
+        "heat": 95,
+        "moisture": 5
+      }
+    },
+    "sulfur_vent": {
+      "biome": "volcano",
+      "name": "Sulfur Vent",
+      "color": "#A89A48",
+      "height": -0.04,
+      "elements": {
+        "life": 0,
+        "ember": 85,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1.4,
+      "stability": 0.4,
+      "conductivity": 0.9,
+      "fertility": 0,
+      "resources": {
+        "sulfur": 4
+      },
+      "environment": {
+        "heat": 85,
+        "moisture": 40
+      }
+    },
+    "snowfield": {
+      "biome": "snow",
+      "name": "Snowfield",
+      "color": "#B2C2CA",
+      "height": 0,
+      "elements": {
+        "life": 16,
+        "ember": 18,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 0.9,
+      "stability": 0.7,
+      "conductivity": 0.9,
+      "fertility": 0.2,
+      "resources": {
+        "ice": 3,
+        "water": 1
+      },
+      "environment": {
+        "heat": 18,
+        "moisture": 55
+      }
+    },
+    "permafrost": {
+      "biome": "snow",
+      "name": "Permafrost",
+      "color": "#7E909A",
+      "height": 0.06,
+      "elements": {
+        "life": 8,
+        "ember": 9,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1.1,
+      "stability": 0.95,
+      "conductivity": 0.8,
+      "fertility": 0.1,
+      "resources": {
+        "frost_quartz": 4
+      },
+      "environment": {
+        "heat": 9,
+        "moisture": 40
+      }
+    },
+    "glacier": {
+      "biome": "snow",
+      "name": "Glacier Ice",
+      "color": "#8FB4C4",
+      "height": 0.1,
+      "elements": {
+        "life": 0,
+        "ember": 4,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1,
+      "stability": 0.55,
+      "conductivity": 1.3,
+      "fertility": 0,
+      "resources": {
+        "ice": 4
+      },
+      "environment": {
+        "heat": 4,
+        "moisture": 70
+      }
+    },
+    "hot_spring": {
+      "biome": "snow",
+      "name": "Hot Spring",
+      "color": "#7FA6A0",
+      "height": -0.05,
+      "elements": {
+        "life": 48,
+        "ember": 60,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1,
+      "stability": 0.5,
+      "conductivity": 1.1,
+      "fertility": 0.6,
+      "resources": {
+        "water": 4
+      },
+      "environment": {
+        "heat": 60,
+        "moisture": 90
+      }
+    },
+    "sheet_sand": {
+      "biome": "desert",
+      "name": "沙地",
+      "color": "#B8925C",
+      "height": 0,
+      "elements": {
+        "life": 8,
+        "ember": 78,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 0.9,
+      "stability": 0.4,
+      "conductivity": 0.9,
+      "fertility": 0.1,
+      "resources": {
+        "sand": 4
+      },
+      "sheet": {
+        "base": "土地",
+        "generation": "面",
+        "level": "1",
+        "rule": "与水域间隔≥1",
+        "tide": "翻转",
+        "correction": [
+          -1,
+          1
+        ],
+        "adaptation": [
+          1,
+          1
+        ],
+        "attachment": "矮灌木",
+        "presence": "生灵补正+1",
+        "departure": "返还一点生灵",
+        "flip_to": "sheet_grass"
+      },
+      "environment": {
+        "heat": 78,
+        "moisture": 10
+      }
+    },
+    "sheet_grass": {
+      "biome": "forest",
+      "name": "草地",
+      "color": "#566E47",
+      "height": 0,
+      "elements": {
+        "life": 64,
+        "ember": 45,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1,
+      "stability": 0.7,
+      "conductivity": 1,
+      "fertility": 0.8,
+      "resources": {
+        "timber": 3,
+        "resin": 1
+      },
+      "sheet": {
+        "base": "土地",
+        "generation": "面",
+        "level": "1",
+        "rule": "与水域相邻",
+        "tide": "翻转",
+        "correction": [
+          1,
+          0
+        ],
+        "adaptation": [
+          1,
+          1
+        ],
+        "attachment": "矮草丛",
+        "presence": "生灵补正+1",
+        "departure": "生灵需求减少一点",
+        "flip_to": "sheet_sand"
+      },
+      "environment": {
+        "heat": 45,
+        "moisture": 58
+      }
+    },
+    "sheet_burnt": {
+      "biome": "volcano",
+      "name": "火烧迹地",
+      "color": "#6D6464",
+      "height": 0,
+      "elements": {
+        "life": 40,
+        "ember": 57,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1,
+      "stability": 0.5,
+      "conductivity": 0.8,
+      "fertility": 0.5,
+      "resources": {
+        "iron_ore": 2,
+        "sulfur": 1
+      },
+      "sheet": {
+        "base": "土地",
+        "generation": "点",
+        "level": "/",
+        "rule": "不生成",
+        "tide": "/",
+        "correction": [
+          2,
+          1
+        ],
+        "adaptation": [
+          1,
+          1
+        ],
+        "attachment": "/",
+        "presence": "/",
+        "departure": "/"
+      },
+      "environment": {
+        "heat": 57,
+        "moisture": 25
+      }
+    },
+    "sheet_river": {
+      "biome": "forest",
+      "name": "河流",
+      "color": "#397f9a",
+      "height": -0.15,
+      "elements": {
+        "life": 72,
+        "ember": 40,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1,
+      "stability": 0.6,
+      "conductivity": 1.2,
+      "fertility": 0.9,
+      "resources": {
+        "water": 4
+      },
+      "sheet": {
+        "base": "水域",
+        "generation": "线",
+        "level": "1",
+        "rule": "初始",
+        "tide": "翻转",
+        "correction": [
+          0,
+          0
+        ],
+        "adaptation": [
+          0,
+          0
+        ],
+        "attachment": "/",
+        "presence": "/",
+        "departure": "/",
+        "flip_to": "sheet_riverbed"
+      },
+      "environment": {
+        "heat": 40,
+        "moisture": 95
+      }
+    },
+    "sheet_riverbed": {
+      "biome": "desert",
+      "name": "河床",
+      "color": "#B07A52",
+      "height": 0.12,
+      "elements": {
+        "life": 8,
+        "ember": 56,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1.2,
+      "stability": 0.9,
+      "conductivity": 1,
+      "fertility": 0.1,
+      "resources": {
+        "copper_ore": 4,
+        "sand": 1
+      },
+      "sheet": {
+        "base": "水域",
+        "generation": "点",
+        "level": "1",
+        "rule": "不生成",
+        "tide": "翻转",
+        "correction": [
+          0,
+          1
+        ],
+        "adaptation": [
+          1,
+          1
+        ],
+        "attachment": "/",
+        "presence": "/",
+        "departure": "/",
+        "flip_to": "sheet_river"
+      },
+      "environment": {
+        "heat": 56,
+        "moisture": 14
+      }
+    },
+    "sheet_oasis": {
+      "biome": "desert",
+      "name": "绿洲",
+      "color": "#6F8C62",
+      "height": -0.06,
+      "elements": {
+        "life": 72,
+        "ember": 60,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1,
+      "stability": 0.6,
+      "conductivity": 1,
+      "fertility": 0.9,
+      "resources": {
+        "water": 3
+      },
+      "sheet": {
+        "base": "水域",
+        "generation": "点",
+        "level": "/",
+        "rule": "随机",
+        "tide": "/",
+        "correction": [
+          2,
+          0
+        ],
+        "adaptation": [
+          0,
+          0
+        ],
+        "attachment": "/",
+        "presence": "/",
+        "departure": "/"
+      },
+      "environment": {
+        "heat": 60,
+        "moisture": 70
+      }
+    }
+  }
+}

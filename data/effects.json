@@ -1,0 +1,421 @@
+{
+  "_doc": "Effects are bound to plots. source: seed (natural, permanent), machine (aura, while the machine stands), weather (whole scene, timed). elements: added to the plot's element values. stats: multiply machine stats on the plot. parcel: added to parcel attributes.",
+  "effects": {
+    "ley_line": {
+      "name": "Ley Line",
+      "source": "seed",
+      "radius": 1,
+      "color": "#B8A6F0",
+      "elements": {
+        "life": 6,
+        "ember": 0
+      },
+      "stats": {
+        "yield": 1.15
+      },
+      "parcel": {},
+      "description": "An old current runs under the soil.",
+      "environment": {
+        "heat": 0,
+        "moisture": 0
+      }
+    },
+    "mycelium_web": {
+      "name": "Mycelium Web",
+      "source": "seed",
+      "radius": 1,
+      "color": "#D9C9A0",
+      "elements": {
+        "life": 13,
+        "ember": 0
+      },
+      "stats": {
+        "wear": 0.85
+      },
+      "parcel": {
+        "fertility": 0.3
+      },
+      "description": "Threads of fungus knit the ground and feed living parts.",
+      "environment": {
+        "heat": 0,
+        "moisture": 8
+      }
+    },
+    "frost_bloom": {
+      "name": "Frost Bloom",
+      "source": "seed",
+      "radius": 1,
+      "color": "#CFEFFF",
+      "elements": {
+        "life": 10,
+        "ember": -20
+      },
+      "stats": {
+        "wear": 0.8
+      },
+      "parcel": {},
+      "description": "Pale flowers that drink heat from the air.",
+      "environment": {
+        "heat": -20,
+        "moisture": 10
+      }
+    },
+    "geyser": {
+      "name": "Geyser",
+      "source": "seed",
+      "radius": 0,
+      "color": "#8ED0E0",
+      "elements": {
+        "life": 25,
+        "ember": 15
+      },
+      "stats": {
+        "energy": 0.85
+      },
+      "parcel": {
+        "richness": 0.2
+      },
+      "description": "Hot water pulses up from below.",
+      "environment": {
+        "heat": 15,
+        "moisture": 25
+      }
+    },
+    "ember_seam": {
+      "name": "Ember Seam",
+      "source": "seed",
+      "radius": 1,
+      "color": "#FF8A4C",
+      "elements": {
+        "life": 5,
+        "ember": 25
+      },
+      "stats": {
+        "speed": 1.1
+      },
+      "parcel": {
+        "richness": 0.15
+      },
+      "description": "A glowing vein of buried heat.",
+      "environment": {
+        "heat": 25,
+        "moisture": 0
+      }
+    },
+    "mirage": {
+      "name": "Mirage",
+      "source": "seed",
+      "radius": 1,
+      "color": "#F7E1A8",
+      "elements": {
+        "life": 6,
+        "ember": 0
+      },
+      "stats": {
+        "yield": 0.9,
+        "speed": 1.1
+      },
+      "parcel": {},
+      "description": "Shimmering air. Things move fast here, but not all of it is real.",
+      "environment": {
+        "heat": 0,
+        "moisture": 0
+      }
+    },
+    "sulfur_plume": {
+      "name": "Sulfur Plume",
+      "source": "seed",
+      "radius": 1,
+      "color": "#D8D060",
+      "elements": {
+        "life": -4,
+        "ember": 10
+      },
+      "stats": {
+        "wear": 1.2
+      },
+      "parcel": {
+        "richness": 0.2
+      },
+      "description": "Acrid smoke that corrodes joints.",
+      "environment": {
+        "heat": 10,
+        "moisture": 0
+      }
+    },
+    "aurora": {
+      "name": "Aurora Glow",
+      "source": "seed",
+      "radius": 1,
+      "color": "#7AF0C0",
+      "elements": {
+        "life": 5,
+        "ember": 0
+      },
+      "stats": {
+        "energy": 0.8
+      },
+      "parcel": {
+        "conductivity": 0.2
+      },
+      "description": "Green light that hums in copper.",
+      "environment": {
+        "heat": 0,
+        "moisture": 0
+      }
+    },
+    "lily_warmth": {
+      "name": "Lily Warmth",
+      "source": "machine",
+      "radius": 1,
+      "color": "#FF9E5E",
+      "elements": {
+        "life": -6,
+        "ember": 22
+      },
+      "stats": {},
+      "parcel": {},
+      "description": "Heat radiating from an Ember Lily.",
+      "environment": {
+        "heat": 22,
+        "moisture": -6
+      }
+    },
+    "fern_mist": {
+      "name": "Fern Mist",
+      "source": "machine",
+      "radius": 1,
+      "color": "#9FD8E8",
+      "elements": {
+        "life": 22,
+        "ember": -8
+      },
+      "stats": {},
+      "parcel": {},
+      "description": "Cool spray from a Mist Fern.",
+      "environment": {
+        "heat": -8,
+        "moisture": 18
+      }
+    },
+    "leaf_draft": {
+      "name": "Leaf Draft",
+      "source": "machine",
+      "radius": 1,
+      "color": "#C8DDA0",
+      "elements": {
+        "life": 3,
+        "ember": 0
+      },
+      "stats": {},
+      "parcel": {},
+      "description": "Wind spilling from Leafwing blades.",
+      "environment": {
+        "heat": 0,
+        "moisture": 0
+      }
+    },
+    "kiln_heat": {
+      "name": "Kiln Heat",
+      "source": "machine",
+      "radius": 1,
+      "color": "#E07850",
+      "elements": {
+        "life": 0,
+        "ember": 8
+      },
+      "stats": {},
+      "parcel": {},
+      "description": "Waste heat leaking from a Seedpod Kiln.",
+      "environment": {
+        "heat": 8,
+        "moisture": 0
+      }
+    },
+    "garden_spores": {
+      "name": "Drifting Spores",
+      "source": "machine",
+      "radius": 1,
+      "color": "#C9B98A",
+      "elements": {
+        "life": 4,
+        "ember": 0
+      },
+      "stats": {},
+      "parcel": {
+        "fertility": 0.15
+      },
+      "description": "Spores settling from a Spore Garden.",
+      "environment": {
+        "heat": 0,
+        "moisture": 4
+      }
+    },
+    "rain": {
+      "name": "Rain",
+      "source": "weather",
+      "duration": 60,
+      "color": "#7FA8C8",
+      "elements": {
+        "life": 15,
+        "ember": -5
+      },
+      "stats": {},
+      "parcel": {},
+      "description": "Soft rain over the grove.",
+      "environment": {
+        "heat": -5,
+        "moisture": 15
+      }
+    },
+    "firefly_swarm": {
+      "name": "Firefly Swarm",
+      "source": "weather",
+      "duration": 45,
+      "color": "#E8F07A",
+      "elements": {
+        "life": 2,
+        "ember": 0
+      },
+      "stats": {
+        "speed": 1.08
+      },
+      "parcel": {},
+      "description": "Little lights crowd the machines and egg them on.",
+      "environment": {
+        "heat": 0,
+        "moisture": 0
+      }
+    },
+    "sandstorm": {
+      "name": "Sandstorm",
+      "source": "weather",
+      "duration": 50,
+      "color": "#D9A86A",
+      "elements": {
+        "life": -2,
+        "ember": 0
+      },
+      "stats": {
+        "wear": 1.3
+      },
+      "parcel": {},
+      "description": "Grit in every gear.",
+      "environment": {
+        "heat": 0,
+        "moisture": -10
+      }
+    },
+    "heatwave": {
+      "name": "Heatwave",
+      "source": "weather",
+      "duration": 60,
+      "color": "#FF8C50",
+      "elements": {
+        "life": 0,
+        "ember": 15
+      },
+      "stats": {},
+      "parcel": {},
+      "description": "The air itself burns.",
+      "environment": {
+        "heat": 15,
+        "moisture": 0
+      }
+    },
+    "ash_fall": {
+      "name": "Ash Fall",
+      "source": "weather",
+      "duration": 55,
+      "color": "#8A8080",
+      "elements": {
+        "life": -4,
+        "ember": 0
+      },
+      "stats": {
+        "energy": 1.15
+      },
+      "parcel": {
+        "fertility": 0.2
+      },
+      "description": "Grey snow that chokes intakes but feeds soil.",
+      "environment": {
+        "heat": 0,
+        "moisture": 0
+      }
+    },
+    "eruption": {
+      "name": "Eruption",
+      "source": "weather",
+      "duration": 35,
+      "color": "#FF5A2A",
+      "elements": {
+        "life": 5,
+        "ember": 20
+      },
+      "stats": {
+        "wear": 1.4
+      },
+      "parcel": {
+        "richness": 0.25
+      },
+      "description": "The mountain coughs up fresh ore and fire.",
+      "environment": {
+        "heat": 20,
+        "moisture": 0
+      }
+    },
+    "blizzard": {
+      "name": "Blizzard",
+      "source": "weather",
+      "duration": 55,
+      "color": "#E0ECF5",
+      "elements": {
+        "life": 6,
+        "ember": -15
+      },
+      "stats": {},
+      "parcel": {},
+      "description": "White-out winds.",
+      "environment": {
+        "heat": -15,
+        "moisture": 0
+      }
+    },
+    "clear_thaw": {
+      "name": "Clear Thaw",
+      "source": "weather",
+      "duration": 60,
+      "color": "#F5E6B0",
+      "elements": {
+        "life": 6,
+        "ember": 12
+      },
+      "stats": {},
+      "parcel": {},
+      "description": "A rare warm hour on the pass.",
+      "environment": {
+        "heat": 12,
+        "moisture": 6
+      }
+    },
+    "silence_field": {
+      "name": "静默融合场",
+      "description": "人工静默技术在周围融合自然能量，提升分化产量并增加运转消耗。",
+      "color": "#AF90D2",
+      "radius": 1,
+      "elements": {
+        "silence": 35
+      }
+    },
+    "eternity_field": {
+      "name": "永恒记录场",
+      "description": "人工永恒技术降低磨损，并允许记录地块、附着物与机械组成，以供完整重塑。",
+      "color": "#88C5DB",
+      "radius": 1,
+      "elements": {
+        "eternity": 35
+      }
+    }
+  }
+}

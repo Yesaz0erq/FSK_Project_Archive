@@ -1,0 +1,132 @@
+{
+  "items": {
+    "timber": {
+      "name": "Timber",
+      "color": "#8A6A45",
+      "icon": "log",
+      "value": 4
+    },
+    "resin": {
+      "name": "Resin",
+      "color": "#D9973A",
+      "icon": "drop",
+      "value": 6
+    },
+    "water": {
+      "name": "Water",
+      "color": "#6FA8C8",
+      "icon": "drop",
+      "value": 2
+    },
+    "sand": {
+      "name": "Sand",
+      "color": "#D7B880",
+      "icon": "pile",
+      "value": 2
+    },
+    "salt": {
+      "name": "Salt",
+      "color": "#ECE6DA",
+      "icon": "crystal",
+      "value": 5
+    },
+    "copper_ore": {
+      "name": "Copper Ore",
+      "color": "#B8774E",
+      "icon": "rock",
+      "value": 5
+    },
+    "iron_ore": {
+      "name": "Iron Ore",
+      "color": "#7C7676",
+      "icon": "rock",
+      "value": 5
+    },
+    "sulfur": {
+      "name": "Sulfur",
+      "color": "#D8C94A",
+      "icon": "pile",
+      "value": 6
+    },
+    "obsidian": {
+      "name": "Obsidian",
+      "color": "#3A3346",
+      "icon": "crystal",
+      "value": 8
+    },
+    "ice": {
+      "name": "Ice",
+      "color": "#BFE3F0",
+      "icon": "crystal",
+      "value": 3
+    },
+    "frost_quartz": {
+      "name": "Frost Quartz",
+      "color": "#9FD0F0",
+      "icon": "crystal",
+      "value": 9
+    },
+    "charcoal": {
+      "name": "Charcoal",
+      "color": "#3B3634",
+      "icon": "log",
+      "value": 6
+    },
+    "spore": {
+      "name": "Spore Pods",
+      "color": "#C9B98A",
+      "icon": "pod",
+      "value": 5
+    },
+    "ingot": {
+      "name": "Iron Ingot",
+      "color": "#A3A9AE",
+      "icon": "ingot",
+      "value": 16
+    },
+    "glass": {
+      "name": "Glass",
+      "color": "#A8D8D0",
+      "icon": "pane",
+      "value": 12
+    },
+    "copper_wire": {
+      "name": "Copper Vine",
+      "color": "#D08A55",
+      "icon": "coil",
+      "value": 10
+    },
+    "cog": {
+      "name": "Wooden Cog",
+      "color": "#B88A4E",
+      "icon": "gear",
+      "value": 30
+    },
+    "lens": {
+      "name": "Dew Lens",
+      "color": "#C8F0F0",
+      "icon": "lens",
+      "value": 34
+    },
+    "bloom_core": {
+      "name": "Bloom Core",
+      "color": "#F0A0B8",
+      "icon": "orb",
+      "value": 180
+    },
+    "life": {
+      "name": "Life",
+      "color": "#9fe08b",
+      "icon": "orb",
+      "value": 8,
+      "description": "一种自然能量，通常表现为植物，聚集足够浓度时可以分化出各种各样的植物组织。"
+    },
+    "ember": {
+      "name": "余烬",
+      "description": "一种自然能量，通常表现为高温与火焰，聚集足够浓度时可以分化出各种各样的矿石与金属。",
+      "color": "#E77A48",
+      "icon": "crystal",
+      "value": 8
+    }
+  }
+}
