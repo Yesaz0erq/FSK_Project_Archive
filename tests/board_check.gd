@@ -7,7 +7,7 @@ func _ready() -> void:
 	add_child(game)
 	var view: Node3D = game.view
 	assert(view._tiles.size() == 121)
-	assert(view._tiles[Vector2i(0, 0)].position.y < -2.0)
+	assert(view._tiles[Vector2i(0, 0)].position.y < view._tile_heights[Vector2i(0, 0)] - 0.6)
 	for b: String in Data.biome_order:
 		var river: Dictionary = {}
 		for y in range(11):

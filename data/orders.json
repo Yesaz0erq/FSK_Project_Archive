@@ -2,6 +2,10 @@
   "_doc": "Order pool. min_rep gates when an order can appear. Open orders expire after 'time' seconds. Rewards: money and reputation.",
   "slots": 4,
   "orders": [
+    {"id": "nursery_life", "customer": "Greenhouse Keeper", "name": "Life for the nursery", "needs": {"life": 4}, "reward": 30, "rep": 1, "time": 240, "min_rep": 0},
+    {"id": "field_ember", "customer": "Moss-hat Hermit", "name": "Embers for the field stove", "needs": {"ember": 5}, "reward": 35, "rep": 1, "time": 240, "min_rep": 0},
+    {"id": "garden_reserve", "customer": "Beetle Postman", "name": "Garden reserves", "needs": {"life": 3, "ember": 3}, "reward": 45, "rep": 1, "time": 260, "min_rep": 0},
+    {"id": "flora_stock", "customer": "Mushroom Choir", "name": "Stock the seed bank", "needs": {"life": 8}, "reward": 60, "rep": 2, "time": 300, "min_rep": 0},
     {"id": "firewood",     "customer": "Moss-hat Hermit",      "name": "Firewood for winter", "needs": {"timber": 6},                      "reward": 40,  "rep": 1, "time": 240, "min_rep": 0},
     {"id": "dew_jars",     "customer": "Beetle Postman",       "name": "Jars of dew",         "needs": {"water": 8},                       "reward": 30,  "rep": 1, "time": 240, "min_rep": 0},
     {"id": "salt_cellar",  "customer": "Salt Moth Inn",        "name": "Salt for the cellar", "needs": {"salt": 5},                        "reward": 50,  "rep": 1, "time": 260, "min_rep": 0},

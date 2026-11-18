@@ -45,9 +45,7 @@ func reload() -> void:
 	for id: Variant in machines.keys():
 		machine_order.append(str(id))
 	machine_order.sort_custom(func(a: String, b2: String) -> bool:
-		var ra: int = int(machines[a].get("unlock_rep", 0))
-		var rb: int = int(machines[b2].get("unlock_rep", 0))
-		return ra < rb if ra != rb else int(machines[a].get("cost", 0)) < int(machines[b2].get("cost", 0)))
+		return int(machines[a].deployment.life_cost) < int(machines[b2].deployment.life_cost))
 	var o: Dictionary = _read("res://data/orders.json")
 	orders = o.get("orders", [])
 	order_slots = int(o.get("slots", 4))

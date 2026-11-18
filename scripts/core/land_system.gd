@@ -12,6 +12,8 @@ extends Node
 signal tide_tile_changed(biome: String, cell: Vector2i, old_land: String, new_land: String, edge: int)
 signal tide_tile_transformed(biome: String, cell: Vector2i, old_land: String, new_land: String, edge: int)
 signal tide_started(edge: int)
+signal tide_finished
+signal riverbed_flooded(biome: String, cell: Vector2i)
 signal parcels_changed(biome: String)
 signal binding_expired(binding: Dictionary)
 
@@ -30,6 +32,7 @@ var _base: Dictionary = {}       # biome -> Array[Dictionary] (index = y * GRID 
 var bindings: Array = []         # Array[Dictionary]
 var _next_binding: int = 1
 var _cache: Dictionary = {}      # biome -> Array (computed parcels) ; missing = dirty
+var river_mouth_columns: Dictionary = {}  # Seed-generated north and south banks, before tides or cultivation.
 
 func generate(seed_value: int) -> void:
 	world_seed = seed_value
@@ -50,6 +53,16 @@ func generate(seed_value: int) -> void:
 
 static func in_grid(cell: Vector2i) -> bool:
 	return cell.x >= 0 and cell.y >= 0 and cell.x < GRID and cell.y < GRID
+
+static func machine_neighbors(cell: Vector2i, area: String) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	for y in range(-1, 2):
+		for x in range(-1, 2):
+			if x == 0 and y == 0: continue
+			if area == "adjacent" and x != 0 and y != 0: continue
+			var neighbor := cell + Vector2i(x, y)
+			if in_grid(neighbor): result.append(neighbor)
+	return result
 
 func _rng_for(biome: String, salt: String = "") -> RandomNumberGenerator:
 	var rng := RandomNumberGenerator.new()
@@ -99,11 +112,14 @@ func _generate_biome(biome: String) -> void:
 			}
 	# Spreadsheet terrain: connected river, adjoining grass, dry land beyond.
 	var river_cells: Dictionary = {}
+	var outlets: Array[Vector2i] = []
 	var rx: int = 5
 	for y in range(GRID):
 		var next_x: int = clampi(rx + rng.randi_range(-1, 1), 4, 6)
+		if y == 0 or y == GRID - 1: outlets.append(Vector2i(mini(rx, next_x), maxi(rx, next_x)))
 		for x in range(mini(rx, next_x), maxi(rx, next_x) + 1): river_cells[Vector2i(x, y)] = true
 		rx = next_x
+	river_mouth_columns[biome] = outlets
 	for y in range(GRID):
 		for x in range(GRID):
 			var cell := Vector2i(x, y)
@@ -196,10 +212,17 @@ func get_parcel(biome: String, cell: Vector2i) -> Dictionary:
 
 func _compute(biome: String, base: Dictionary) -> Dictionary:
 	var land: Dictionary = Data.land_types[base.land]
+	var sheet: Dictionary = land.get("sheet", {})
+	var key: String = parcel_key(biome, base.cell)
+	var offsets: Dictionary = energy_offsets.get(key, {})
+	var correction: Array = sheet.get("correction", [0, 0])
+	var life_concentration: int = int(correction[0]) + int(offsets.get("concentration", 0))
+	if not cleared.has(key) and sheet.get("presence", "/") == "生灵补正+1":
+		life_concentration += 1
 	var base_el: Dictionary = {}
 	var el: Dictionary = {}
 	for e: String in Data.element_ids:
-		base_el[e] = clampf(float(land.elements.get(e, 0)) + float(base.jitter.get(e, 0)) + float(energy_offsets.get(parcel_key(biome, base.cell), {}).get(e, 0)), 0.0, 100.0)
+		base_el[e] = clampf(float(land.elements.get(e, 0)) + float(base.jitter.get(e, 0)) + float(offsets.get(e, 0)), 0.0, 100.0)
 		el[e] = base_el[e]
 	var heat: float = float(land.environment.heat)
 	var moisture: float = float(land.environment.moisture)
@@ -226,7 +249,8 @@ func _compute(biome: String, base: Dictionary) -> Dictionary:
 		"biome": biome, "cell": base.cell, "land": base.land, "land_name": land.name,
 		"land_color": Color(str(land.color)), "height": float(land.get("height", 0.0)), "variant": base.variant,
 		"heat": heat, "moisture": moisture,
-		"sheet": land.get("sheet", {}), "attachment_cleared": cleared.has(parcel_key(biome, base.cell)),
+		"sheet": sheet, "attachment_cleared": cleared.has(key),
+		"life_concentration": life_concentration, "stabilized": bool(offsets.get("stabilized", false)),
 		"base_elements": base_el, "elements": el,
 		"base_temperature": Data.temperature_class(float(land.environment.heat), float(land.environment.moisture)),
 		"temperature": Data.temperature_class(heat, moisture),
@@ -244,6 +268,20 @@ func save_bindings() -> Array:
 
 func parcel_key(biome: String, cell: Vector2i) -> String:
 	return "%s:%d:%d" % [biome, cell.x, cell.y]
+
+func change_concentration(biome: String, cell: Vector2i, amount: int, stabilize: bool = false) -> void:
+	var key: String = parcel_key(biome, cell)
+	var offsets: Dictionary = energy_offsets.get(key, {})
+	offsets["concentration"] = int(offsets.get("concentration", 0)) + amount
+	if stabilize: offsets["stabilized"] = true
+	energy_offsets[key] = offsets
+	_invalidate(biome)
+
+func seed_plot(biome: String, cell: Vector2i) -> void:
+	var p: Dictionary = get_parcel(biome, cell)
+	if p.land != "sheet_grass":
+		_replace_land(biome, cell, "sheet_grass", false, 0)
+	change_concentration(biome, cell, 1, true)
 
 func clear_attachment(biome: String, cell: Vector2i) -> void:
 	var p: Dictionary = get_parcel(biome, cell)
@@ -274,14 +312,24 @@ func start_tide() -> void:
 	tide_started.emit(edge)
 
 func _tick_tide(delta: float) -> void:
-	if tide_state.is_empty():
-		if Settings.tide_seconds <= 0: return
-		tide_elapsed += delta
-		if tide_elapsed >= Settings.tide_seconds: start_tide()
-		return
-	tide_state.elapsed = float(tide_state.elapsed) + delta
-	while not tide_state.is_empty() and float(tide_state.elapsed) >= TIDE_ROW_SECONDS:
-		tide_state.elapsed = float(tide_state.elapsed) - TIDE_ROW_SECONDS
+	var remaining := delta
+	while remaining > 0.0:
+		if tide_state.is_empty():
+			if Settings.tide_seconds <= 0.0: return
+			var until_tide := maxf(0.0, Settings.tide_seconds - tide_elapsed)
+			if remaining < until_tide:
+				tide_elapsed += remaining
+				return
+			remaining -= until_tide
+			start_tide()
+		var until_row := maxf(0.0, TIDE_ROW_SECONDS - float(tide_state.elapsed))
+		if remaining + 0.000000001 < until_row:
+			tide_state.elapsed = float(tide_state.elapsed) + remaining
+			tide_elapsed += remaining
+			return
+		remaining = maxf(0.0, remaining - until_row)
+		tide_elapsed += until_row
+		tide_state.elapsed = 0.0
 		var row: int = int(tide_state.row)
 		var edge: int = int(tide_state.edge)
 		for b: String in Data.biome_order:
@@ -289,7 +337,21 @@ func _tick_tide(delta: float) -> void:
 				var cell := Vector2i(row if edge == 0 else GRID - 1 - row, i) if edge < 2 else Vector2i(i, row if edge == 2 else GRID - 1 - row)
 				_tide_replace(b, cell, edge)
 		tide_state.row = row + 1
-		if int(tide_state.row) >= GRID: tide_state.clear()
+		if int(tide_state.row) >= GRID:
+			tide_state.clear()
+			_water_oasis_neighbors(edge)
+			tide_finished.emit()
+
+# Resolve oasis conversions after the last row so their outcome is identical
+# for eastbound and westbound tides.
+func _water_oasis_neighbors(edge: int) -> void:
+	for biome: String in Data.biome_order:
+		for base: Dictionary in _base[biome]:
+			if base.land != "sheet_oasis": continue
+			for cell in machine_neighbors(base.cell, "adjacent"):
+				var p: Dictionary = get_parcel(biome, cell)
+				if p.sheet.get("base", "") == "土地" and p.land != "sheet_grass" and not p.stabilized:
+					_replace_land(biome, cell, "sheet_grass", false, edge)
 
 func _tide_replace(biome: String, cell: Vector2i, edge: int) -> void:
 	var base: Dictionary = _base[biome][cell.y * GRID + cell.x]
@@ -301,8 +363,13 @@ func _tide_replace(biome: String, cell: Vector2i, edge: int) -> void:
 	for energy_id: String in ["life", "ember"]:
 		var current: float = float(get_parcel(biome, cell).elements[energy_id])
 		offsets[energy_id] = float(offsets.get(energy_id, 0)) + clampf(current + flow * 10.0, 0, 100) - current
+	offsets["concentration"] = int(offsets.get("concentration", 0)) + 1
 	energy_offsets[key] = offsets
 	_invalidate(biome)
+	if old_id == "sheet_riverbed":
+		clear_attachment(biome, cell)
+		riverbed_flooded.emit(biome, cell)
+	if bool(offsets.get("stabilized", false)): return
 	var mode: String = str(rule.get("tide", "/"))
 	var next_id: String = ""
 	if mode == "翻转":
@@ -318,14 +385,19 @@ func _tide_replace(biome: String, cell: Vector2i, edge: int) -> void:
 		var rng := _rng_for(biome, "tide:%d:%d:%d" % [tide_count, cell.x, cell.y])
 		next_id = candidates[rng.randi_range(0, candidates.size() - 1)]
 	else: return
-	if next_id != old_id:
-		# Apply departure once; a replacement gets its own attachment state.
-		clear_attachment(biome, cell)
-		cleared.erase(parcel_key(biome, cell))
+	_replace_land(biome, cell, next_id, mode == "翻转", edge)
+
+func _replace_land(biome: String, cell: Vector2i, next_id: String, flip: bool, edge: int) -> void:
+	var base: Dictionary = _base[biome][cell.y * GRID + cell.x]
+	var old_id: String = base.land
+	if old_id == next_id: return
+	clear_attachment(biome, cell)
+	var key: String = parcel_key(biome, cell)
+	cleared.erase(key)
 	base.land = next_id
-	terrain_overrides[parcel_key(biome, cell)] = next_id
+	terrain_overrides[key] = next_id
 	_invalidate(biome)
-	if mode == "翻转": tide_tile_changed.emit(biome, cell, old_id, next_id, edge)
+	if flip: tide_tile_changed.emit(biome, cell, old_id, next_id, edge)
 	else: tide_tile_transformed.emit(biome, cell, old_id, next_id, edge)
 
 func restore_terrain(saved: Dictionary) -> void:

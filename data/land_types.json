@@ -398,6 +398,7 @@
         "base": "土地",
         "generation": "面",
         "level": "1",
+        "support": 1,
         "rule": "与水域间隔≥1",
         "tide": "翻转",
         "correction": [
@@ -441,6 +442,7 @@
         "base": "土地",
         "generation": "面",
         "level": "1",
+        "support": 3,
         "rule": "与水域相邻",
         "tide": "翻转",
         "correction": [
@@ -484,6 +486,7 @@
         "base": "土地",
         "generation": "点",
         "level": "/",
+        "support": 3,
         "rule": "不生成",
         "tide": "/",
         "correction": [
@@ -525,6 +528,7 @@
         "base": "水域",
         "generation": "线",
         "level": "1",
+        "support": 0,
         "rule": "初始",
         "tide": "翻转",
         "correction": [
@@ -568,6 +572,7 @@
         "base": "水域",
         "generation": "点",
         "level": "1",
+        "support": 3,
         "rule": "不生成",
         "tide": "翻转",
         "correction": [
@@ -610,6 +615,7 @@
         "base": "水域",
         "generation": "点",
         "level": "/",
+        "support": 0,
         "rule": "随机",
         "tide": "/",
         "correction": [

@@ -9,6 +9,12 @@
 !/docs/.gdignore
 !/docs/world-terms-preview.png
 !/docs/terrain-models-preview.png
+!/docs/initial-machines.png
+!/docs/flora-machines.png
+!/docs/landscape-3d.jpg
+!/docs/landscape-orbit.mp4
+!/docs/clarity-comparison.png
+!/docs/native-detail-1080.png
 
 # One-time migration helpers; retain the reusable asset generators.
 /tools/add_*.cjs
@@ -18,3 +24,5 @@
 /tools/update_*.cjs
 /tools/tide_visual.cjs
 /tools/restyle_environment.cjs
+
+/tools/life_growth_integration.cjs

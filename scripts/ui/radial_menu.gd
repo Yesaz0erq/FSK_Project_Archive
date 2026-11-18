@@ -11,6 +11,10 @@ var _labels: Array[Label] = []
 var _center_label: Label
 var _pressed_at := Vector2.ZERO
 var _moved: bool = false
+var _open_motion: Tween
+var _dismiss_motion: Tween
+var _aperture := 1.0
+var _weights := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -31,6 +35,7 @@ func _ready() -> void:
 	add_child(_center_label)
 	get_window().focus_exited.connect(cancel)
 	hide()
+	set_process(false)
 
 func open_at(point: Vector2, entries: Array) -> void:
 	options = entries
@@ -40,14 +45,28 @@ func open_at(point: Vector2, entries: Array) -> void:
 	_moved = false
 	selected = -1
 	active = true
+	if _dismiss_motion: _dismiss_motion.kill()
+	_weights.fill(0)
+	_aperture = 0.76
+	if _open_motion: _open_motion.kill()
+	_open_motion = create_tween().set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+	_open_motion.tween_method(_set_aperture, _aperture, 1.0, 0.16)
 	show()
+	UITheme.reveal(self, 0.12)
 	_layout_labels()
 	queue_redraw()
 
 func cancel() -> void:
+	if not active: return
 	active = false
+	if _open_motion: _open_motion.kill()
+	set_process(false)
+	var entering: Tween = get_meta(&"reveal")
+	entering.kill()
+	_dismiss_motion = create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_dismiss_motion.tween_property(self, "modulate:a", 0.0, 0.11)
+	_dismiss_motion.tween_callback(hide)
 	selected = -1
-	hide()
 
 func direction_at(point: Vector2) -> int:
 	var delta: Vector2 = point - center
@@ -71,33 +90,61 @@ func _input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 func _update_selection(point: Vector2) -> void:
-	selected = direction_at(point) if _moved else -1
+	var next := direction_at(point) if _moved else -1
+	if selected == next: return
+	selected = next
+	set_process(true)
 	_layout_labels()
 	queue_redraw()
 
 func _layout_labels() -> void:
 	for i in range(4):
 		var direction := Vector2.from_angle(-PI * 0.5 + float(i) * PI * 0.5)
-		_labels[i].position = center + direction * 92.0 - _labels[i].size * 0.5
+		_labels[i].position = center + direction * 91.0 * _aperture - _labels[i].size * 0.5
 		_labels[i].text = str(options[i].label)
 		var enabled: bool = bool(options[i].enabled)
 		_labels[i].add_theme_color_override("font_color", UITheme.BRASS if enabled and selected == i else (UITheme.CREAM if enabled else Color("77777f")))
 	_center_label.position = center - _center_label.size * 0.5
 	_center_label.text = tr("Cancel") if selected < 0 else (tr("Release") if bool(options[selected].enabled) else tr("Unavailable"))
 
+func _set_aperture(value: float) -> void:
+	_aperture = value
+	_layout_labels()
+	queue_redraw()
+
+func _process(delta: float) -> void:
+	var moving := false
+	for i in range(4):
+		var target := 1.0 if selected == i else 0.0
+		_weights[i] = move_toward(_weights[i], target, delta * 7.5)
+		if not is_equal_approx(_weights[i], target): moving = true
+	queue_redraw()
+	set_process(moving)
+
 func _draw() -> void:
 	if not active: return
-	draw_circle(center, OUTER + 7.0, Color(0.02,0.025,0.04,0.75))
+	var ring := OUTER * _aperture
 	for i in range(4):
-		var angle: float = -PI * 0.5 + float(i) * PI * 0.5
+		var angle := -PI * 0.5 + i * PI * 0.5
+		var enabled: bool = options[i].enabled
+		var weight := _weights[i]
+		var first := angle - PI * 0.24
+		var last := angle + PI * 0.24
+		var radius := ring + weight * 5.0
 		var points := PackedVector2Array()
-		var first: float = angle - PI * 0.25 + 0.025
-		var last: float = angle + PI * 0.25 - 0.025
-		for step in range(25): points.append(center + Vector2.from_angle(lerpf(first,last,step/24.0)) * OUTER)
-		for step in range(24,-1,-1): points.append(center + Vector2.from_angle(lerpf(first,last,step/24.0)) * INNER)
-		var enabled: bool = bool(options[i].enabled)
-		var color := Color("242938") if enabled else Color("1c1f29")
-		if i == selected: color = Color("514536") if enabled else Color("2c2b32")
-		draw_colored_polygon(points, color)
-		draw_arc(center, OUTER, first, last, 24, UITheme.BRASS if i == selected and enabled else Color("626071"), 2.0, true)
-	draw_circle(center, INNER - 2.0, Color("171b26"))
+		# Seven facets per sector keep the aperture and highlighted rim visibly cut.
+		for step in range(7):
+			points.append(center + Vector2.from_angle(lerpf(first,last,step/6.0)) * radius)
+		for step in range(6,-1,-1):
+			points.append(center + Vector2.from_angle(lerpf(first,last,step/6.0)) * INNER)
+		var ink := Color("142638f6") if enabled else Color("152030ed")
+		var lit := Color("285653") if enabled else Color("27313d")
+		draw_colored_polygon(points, ink.lerp(lit, weight))
+		points.append(points[0])
+		var rim := UITheme.BORDER.lerp(UITheme.JADE if enabled else UITheme.MUTED, weight)
+		draw_polyline(points, rim, 1.0, true)
+		draw_arc(center, radius - 5, angle - 0.16 - weight * 0.14, angle + 0.16 + weight * 0.14, 4, rim, 3.0)
+		var cursor := center + Vector2.from_angle(angle) * (INNER + 11)
+		draw_rect(Rect2(cursor.round() - Vector2(2,2), Vector2(4,4)), rim)
+	draw_circle(center, INNER - 3, Color("0c1829ef"))
+	draw_arc(center, INNER - 4, 0.0, TAU, 12, UITheme.BORDER, 1.5)

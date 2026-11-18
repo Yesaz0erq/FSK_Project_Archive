@@ -1,105 +1,108 @@
 extends Node
-## godot --headless --path . res://tests/sim_test.tscn
-var fails: int = 0
+## Run with godot --headless --path . res://tests/sim_test.tscn.
 
-func check(cond: bool, msg: String) -> void:
-	if cond: print("  ok   ", msg)
-	else:
-		fails += 1
-		print("  FAIL ", msg)
+const BIOME := "forest"
+var failures := 0
+
+func check(condition: bool, label: String) -> void:
+	if not condition:
+		failures += 1
+		push_error(label)
 
 func _ready() -> void:
-	var Data: Node = get_node("/root/" + "Data")
-	var Land: Node = get_node("/root/" + "Land")
-	var Sim: Node = get_node("/root/" + "Sim")
-	print("== land generation")
-	Sim.new_game(12345)
-	var a: Dictionary = Land.get_parcel("forest", Vector2i(3, 4)).duplicate(true)
-	Sim.new_game(12345)
-	var b: Dictionary = Land.get_parcel("forest", Vector2i(3, 4))
-	check(a.land == b.land and a.elements == b.elements, "same seed -> same parcels")
-	Sim.new_game(999)
-	var diff: int = 0
-	for y in 11:
-		for x in 11:
-			if Land.get_parcel("forest", Vector2i(x, y)).land != a.land: diff += 1
-	check(diff > 0, "different seed -> different land")
-	var temps: Dictionary = {}
-	var types: Dictionary = {}
-	var deposits: Dictionary = {}
-	for seed_try in [1, 2, 3, 4, 5]:
-		Sim.new_game(seed_try)
-		for biome in Data.biome_order:
-			for y in 11:
-				for x in 11:
-					var p: Dictionary = Land.get_parcel(biome, Vector2i(x, y))
-					temps[p.temperature] = int(temps.get(p.temperature, 0)) + 1
-					types[p.land] = true
-					if p.deposit != "": deposits[p.deposit] = true
-					# inheritance: base = land type +- jitter
-					var lt: Dictionary = Data.land_types[p.land]
-					for e in Data.element_ids:
-						if absf(float(p.base_elements[e]) - clampf(float(lt.elements[e]), 0, 100)) > Land.JITTER + 0.01:
-							check(false, "inheritance %s %s" % [p.land, e])
-	print("  temperature spread: ", temps)
-	check(temps.size() == 6, "all six temperature classes appear")
-	check(types.size() == Data.land_types.size(), "all land types appear")
-	check(deposits.size() >= 11, "deposits for every resource: %d" % deposits.size())
-	print("== effect binding")
-	Sim.new_game(42)
-	var cell := Vector2i(5, 5)
-	var before: float = float(Land.get_parcel("snow", cell).elements.fire)
-	var id: int = Land.bind_effect("lily_warmth", "snow", cell, 1, "machine", "test", -1.0)
-	var after: float = float(Land.get_parcel("snow", cell).elements.fire)
-	check(after > before or after == 100.0, "aura raises fire %.0f -> %.0f" % [before, after])
-	var effs: Array = Land.get_parcel("snow", Vector2i(6, 6)).effects.map(func(x): return x.effect)
-	var effs_far: Array = Land.get_parcel("snow", Vector2i(7, 7)).effects.map(func(x): return x.effect)
-	check(effs.has("lily_warmth") and not effs_far.has("lily_warmth"), "radius 1 covers neighbour only")
-	Land.unbind_source("test")
-	check(is_equal_approx(float(Land.get_parcel("snow", cell).elements.fire), before), "unbind restores")
-	Land.bind_effect("heatwave", "desert", Vector2i(5, 5), -1, "weather", "w", 2.0)
-	var hot: float = float(Land.get_parcel("desert", Vector2i(0, 0)).elements.fire)
-	Land.tick(3.0)
-	check(float(Land.get_parcel("desert", Vector2i(0, 0)).elements.fire) <= hot, "timed weather expires")
-	print("== element stats")
-	var p_hot: Dictionary = Land.get_parcel("volcano", Vector2i(2, 2)).duplicate(true)
-	p_hot.elements = {"fire": 95, "water": 5, "earth": 50, "air": 50}
-	p_hot.temperature = Data.temperature_class(95, 5)
-	var p_cold: Dictionary = p_hot.duplicate(true)
-	p_cold.elements = {"fire": 5, "water": 50, "earth": 50, "air": 50}
-	p_cold.temperature = Data.temperature_class(5, 50)
-	var sh: Dictionary = StatMath.machine_stats("seedpod_kiln", p_hot)
-	var sc: Dictionary = StatMath.machine_stats("seedpod_kiln", p_cold)
-	print("  kiln hot ", sh.speed, " cold ", sc.speed)
-	check(float(sh.speed) > float(sc.speed), "fire speeds the kiln")
-	check(float(sh.wear) > float(sc.wear), "fire wears the kiln")
-	var ph: Dictionary = StatMath.machine_stats("pitcher_still", p_cold)
-	check(float(ph.speed) == 0.0, "pitcher still freezes (%s)" % p_cold.temperature)
-	print("== economy")
+	Sim.new_game(2026)
+	Sim.paused = true
+	check(Data.machines.size() == 3, "Only the three FT1 flora machines are registered")
+	check(Land.machine_neighbors(Vector2i(5, 5), "adjacent").size() == 4, "Four edge neighbors")
+	check(Land.machine_neighbors(Vector2i(5, 5), "surrounding").size() == 8, "Eight surrounding neighbors")
+	check(Land.machine_neighbors(Vector2i.ZERO, "adjacent").size() == 2, "Corner clips four-way range")
+	check(Land.machine_neighbors(Vector2i.ZERO, "surrounding").size() == 3, "Corner clips eight-way range")
+	var all_plots: Dictionary = {}
+	for b: String in Data.biome_order:
+		for y in Land.GRID:
+			for x in Land.GRID:
+				all_plots[Land.parcel_key(b, Vector2i(x, y))] = "sheet_burnt"
+	var test_cell := Vector2i(0, 1)
+	var site_key := Land.parcel_key(BIOME, test_cell)
+	for id: String in ["sheet_river", "sheet_oasis"]:
+		all_plots[site_key] = id
+		Land.restore_terrain(all_plots)
+		for machine: String in Data.machines:
+			check(not Sim.machine_site_reason(machine, BIOME, test_cell).is_empty(), "Unsupported site: " + machine)
+	all_plots[site_key] = "sheet_sand"
+	Land.restore_terrain(all_plots)
+	check(Sim.machine_site_reason("propagator", BIOME, test_cell).is_empty(), "Sand and shrub have concentration 0")
+	check(not Sim.machine_site_reason("collector", BIOME, test_cell).is_empty(), "Collector needs concentration 1")
+	Land.clear_attachment(BIOME, test_cell)
+	check(Land.get_parcel(BIOME, test_cell).life_concentration == -1, "Removing the shrub reveals negative concentration")
+	check(not Sim.machine_site_reason("propagator", BIOME, test_cell).is_empty(), "Propagator refuses negative site")
+	check(Sim.machine_site_reason("extractor", BIOME, test_cell).is_empty(), "Extractor has no site concentration requirement")
+
+	# Count only machine production by removing all terrain departure rewards.
+	all_plots[site_key] = "sheet_burnt"
+	Land.restore_terrain(all_plots)
+	for y in Land.GRID:
+		for x in Land.GRID: Land.change_concentration(BIOME, Vector2i(x, y), -2)
+	var producer := _machine("extractor", Vector2i(5, 4))
+	var collector := _machine("collector", Vector2i(5, 5))
+	var propagator := _machine("propagator", Vector2i(4, 4))
+	var corner_pump := _machine("extractor", Vector2i.ZERO)
+	var suppressed := _machine("propagator", Vector2i(10, 10))
+	for cell in Land.machine_neighbors(suppressed.cell, "adjacent"):
+		Land.change_concentration(BIOME, cell, -5)
+	for cell in [Vector2i(6, 5), Vector2i(5, 6)]: Land.change_concentration(BIOME, cell, 1)
+	var life_before := Sim.count("life")
+	Land.start_tide()
+	Sim.step(Land.TIDE_ROW_SECONDS * 5.0)
+	check(propagator.cycles == 0 and producer.cycles == 0, "Machines wait for the whole wave")
+	Sim.step(Land.TIDE_ROW_SECONDS * 6.0 + 0.01)
+	check(propagator.cycles == 4, "Propagator seeds four plots")
+	check(collector.cycles == 1 and Sim.count("life") == life_before + 1, "Collection follows seeding and precedes extraction")
+	check(producer.cycles == 1 and Sim.count("liquid_energy_canister") == 1, "Extractor produces one canister from eight")
+	check(corner_pump.cycles == 0 and corner_pump.carry.concentration == 3, "Corner pump retains three extracted points")
+	check(suppressed.cycles == 0, "A wholly negative neighborhood cannot activate")
+	var seeded := Vector2i(3, 4)
+	var diagonal := Vector2i(3, 3)
+	check(Land.get_parcel(BIOME, seeded).stabilized and Land.get_parcel(BIOME, seeded).land == "sheet_grass", "Seeded cardinal is stable grass")
+	check(not Land.get_parcel(BIOME, diagonal).stabilized and Land.get_parcel(BIOME, diagonal).land == "sheet_burnt", "Diagonal excluded from seeding")
+	var before: int = Land.get_parcel(BIOME, seeded).life_concentration
+	Sim.toggle_enabled(propagator.uid)
+	_full_tide()
+	check(Land.get_parcel(BIOME, seeded).land == "sheet_grass", "Stable grass does not flip")
+	check(Land.get_parcel(BIOME, seeded).life_concentration == before + 1, "Stable grass receives tidal concentration")
+	check(propagator.cycles == 4, "Disabled machine does not seed")
+	_full_tide()
+	check(corner_pump.cycles == 1 and corner_pump.carry.concentration == 1, "Partial extractions carry across three tides")
+	var saved_path := "user://ft1-tide-test-%s.json" % OS.get_process_id()
+	Land.start_tide()
+	Sim.step(2.24)
+	var wave_row: int = Land.tide_state.row
+	var corner_uid: int = corner_pump.uid
+	var cans_before := Sim.count("liquid_energy_canister")
+	check(Sim.save_game(saved_path), "Can save mid-wave")
 	Sim.new_game(7)
-	var dep_cell := Vector2i(-1, -1)
-	for y in 11:
-		for x in 11:
-			if Land.get_parcel("forest", Vector2i(x, y)).deposit == "timber": dep_cell = Vector2i(x, y)
-	check(dep_cell.x >= 0, "forest has a timber deposit")
-	check(Sim.place_machine("taproot_drill", "forest", Vector2i(dep_cell.x, dep_cell.y)) == "", "place drill on deposit")
-	var free := Vector2i(-1, -1)
-	for y in 11:
-		for x in 11:
-			if free.x < 0 and Land.get_parcel("forest", Vector2i(x, y)).deposit == "" : free = Vector2i(x, y)
-	check(Sim.place_machine("taproot_drill", "forest", free) != "", "drill refused off-deposit")
-	check(Sim.place_machine("leafwing_turbine", "forest", free) == "", "place turbine")
-	check(Sim.place_machine("bloom_press", "forest", Vector2i(0, 0)) != "", "locked machine refused")
-	var t0: int = Sim.count("timber")
-	for i in 600: Sim.step(0.1)
-	print("  timber ", t0, " -> ", Sim.count("timber"), "  energy ", Sim.energy)
-	check(Sim.count("timber") > t0, "drill produced timber")
-	check(Sim.save_game(), "save")
-	var money: int = Sim.money
-	var t1: int = Sim.count("timber")
-	Sim.new_game(1)
-	check(Sim.load_game(), "load")
-	check(Sim.money == money and Sim.count("timber") == t1 and Sim.machines.size() == 2, "state restored")
-	check(Land.bindings.filter(func(bb): return bb.source == "machine").size() == 1, "turbine aura rebound")
-	print("FAILS: ", fails)
-	get_tree().quit(1 if fails > 0 else 0)
+	check(Sim.load_game(saved_path), "Can restore mid-wave")
+	check(Land.tide_state.row == wave_row and Sim.count("liquid_energy_canister") == cans_before, "Loading does not settle an unfinished tide")
+	check(Sim.machines[corner_uid].carry.concentration == 1 and Land.get_parcel(BIOME, seeded).stabilized, "Stored concentration, stability, and machine carry survive loading")
+	Sim.step(5.5)
+	check(Land.tide_state.is_empty() and Sim.machines[corner_uid].carry.concentration == 4, "Restored wave settles exactly once")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(saved_path))
+
+	# A flooded riverbed destroys its installed machine when the front crosses.
+	var flooded := Vector2i(2, 7)
+	Land.restore_terrain({Land.parcel_key(BIOME, flooded): "sheet_riverbed"})
+	var on_riverbed := _machine("extractor", flooded)
+	_full_tide()
+	check(not Sim.machines.has(on_riverbed.uid) and Land.get_parcel(BIOME, flooded).land == "sheet_river", "Flooded riverbed removes its machine")
+	print("FT1 TIDE CHECK: ", failures, " failures")
+	get_tree().quit(1 if failures > 0 else 0)
+
+func _machine(id: String, cell: Vector2i) -> Dictionary:
+	var m := Sim._make_machine(id, BIOME, cell, Sim.next_uid)
+	Sim.machines[m.uid] = m
+	Sim.next_uid += 1
+	return m
+
+func _full_tide() -> void:
+	Land.start_tide()
+	Sim.step(Land.TIDE_ROW_SECONDS * Land.GRID + 0.01)

@@ -30,13 +30,14 @@ func _initialize() -> void:
 			for index in [0,1,2,0,2,3]:
 				st.set_normal(normals[face])
 				st.set_uv(uv[index])
+				if face == 0: st.set_uv2(uv[index])
 				st.add_vertex(faces[face][index])
 			st.set_material(top if face == 0 else (bottom if face == 5 else side))
 			st.commit(mesh)
-		ResourceSaver.save(mesh, "res://assets/models/terrain/" + id + ".tres")
+		ResourceSaver.save(mesh, "res://assets/models/terrain/" + id + ".tres", ResourceSaver.FLAG_CHANGE_PATH)
 		var node := MeshInstance3D.new()
 		node.name = id
-		node.mesh = mesh
+		node.mesh = load("res://assets/models/terrain/" + id + ".tres")
 		var scene := PackedScene.new()
 		scene.pack(node)
 		ResourceSaver.save(scene, "res://assets/models/terrain/" + id + ".tscn")
@@ -47,10 +48,17 @@ func _initialize() -> void:
 func _material(id: String, kind: String) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.resource_name = id + "_" + kind
-	var image := Image.new()
-	image.load_svg_from_string(FileAccess.get_file_as_string("res://assets/terrain/" + id + "_" + kind + ".svg"))
-	material.albedo_texture = ImageTexture.create_from_image(image)
-	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	material.roughness = 0.95
-	material.metallic_specular = 0.1
+	var extension := "png" if kind == "top" else "svg"
+	material.albedo_texture = load("res://assets/terrain/%s_%s.%s" % [id, kind, extension])
+	var span := (252.0 if kind == "top" else 124.0) / 512.0
+	material.uv1_scale = Vector3(span, span, 1.0)
+	material.uv1_offset = Vector3(2.0 / 512.0, 2.0 / 512.0, 0.0)
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS_ANISOTROPIC
+	material.texture_repeat = false
+	if kind == "top":
+		material.detail_enabled = true
+		material.detail_uv_layer = BaseMaterial3D.DETAIL_UV_2
+		material.detail_albedo = load("res://assets/terrain/parcel_corner.svg")
+	material.roughness = 0.66 if id in ["sheet_river", "sheet_oasis"] and kind == "top" else 0.96
+	material.metallic_specular = 0.18
 	return material

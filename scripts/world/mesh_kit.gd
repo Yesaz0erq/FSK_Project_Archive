@@ -82,18 +82,25 @@ static func plane(parent: Node, size: Vector2, pos: Vector3, color: Color, emiss
 
 static func particles(parent: Node, pos: Vector3, color: Color, amount: int, extents: Vector3, velocity: Vector3, size: float, lifetime: float, emission: float = 0.0) -> CPUParticles3D:
 	var p := CPUParticles3D.new()
-	var q := QuadMesh.new()
-	q.size = Vector2(size, size)
+	var fleck := BoxMesh.new()
+	var streak := velocity.length() > 4.0
+	fleck.size = Vector3(size*0.42, size*3.6, size*0.42) if streak else Vector3(size, size*0.72, size*0.77)
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.vertex_color_use_as_albedo = true
-	m.albedo_texture = _soft_dot()
 	if emission > 0.0:
 		m.albedo_color = Color(1.0 + emission, 1.0 + emission, 1.0 + emission)
-	q.material = m
-	p.mesh = q
+	fleck.material = m
+	p.mesh = fleck
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if streak:
+		p.particle_flag_align_y = true
+	else:
+		p.angle_min = -120.0
+		p.angle_max = 120.0
+		p.angular_velocity_min = -36.0
+		p.angular_velocity_max = 42.0
 	p.amount = amount
 	p.lifetime = lifetime
 	p.preprocess = lifetime

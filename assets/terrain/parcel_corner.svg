@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 64 64" shape-rendering="crispEdges">
+  <path fill="#27283b" fill-opacity=".43" d="M0 0h7v2H2v5H0z M64 0h-7v2h5v5h2z M64 64h-7v-2h5v-5h2z M0 64h7v-2H2v-5H0z"/>
+  <path fill="#e2dec2" fill-opacity=".58" d="M1 1h4v1H2v3H1z M63 1h-4v1h3v3h1z M63 63h-4v-1h3v-3h1z M1 63h4v-1H2v-3H1z"/>
+</svg>

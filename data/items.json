@@ -1,5 +1,12 @@
 {
   "items": {
+    "liquid_energy_canister": {
+      "name": "Liquid Energy Canister",
+      "color": "#78E3D1",
+      "icon": "bottle",
+      "value": 0,
+      "description": "Liquid Life energy recovered by an Extractor. A trophy for use outside the field."
+    },
     "timber": {
       "name": "Timber",
       "color": "#8A6A45",

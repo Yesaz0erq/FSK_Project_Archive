@@ -4,6 +4,7 @@ var cell := Vector2i(3,4)
 var uid: int
 func _ready() -> void:
 	get_window().size = Vector2i(1600,960)
+	Settings.autosave_seconds = 0
 	Sim.new_game(2026)
 	Sim.paused = true
 	Sim.money = 5000
@@ -11,7 +12,15 @@ func _ready() -> void:
 	for id: String in Data.items: Sim.inventory[id] = 100
 	game = load("res://scenes/game.tscn").instantiate()
 	add_child(game)
-	assert(Sim.place_machine("seedpod_kiln","forest",cell) == "")
+	for y in Land.GRID:
+		for x in Land.GRID:
+			var candidate := Vector2i(x, y)
+			if Sim.can_add_life("forest", candidate) == "" and Sim.machine_site_reason("propagator", "forest", candidate) == "":
+				cell = candidate
+				break
+		if cell.y == y and Sim.can_add_life("forest", cell) == "" and Sim.machine_site_reason("propagator", "forest", cell) == "": break
+	assert(Sim.add_life_point("forest", cell) == "")
+	Sim._tick_life_growth(15.0)
 	uid = int(Sim.machine_at("forest",cell).uid)
 	await get_tree().create_timer(1.7).timeout
 	_open()
@@ -29,11 +38,9 @@ func _ready() -> void:
 	assert(not Sim.machines[uid].enabled)
 	_open()
 	_drag(Vector2.RIGHT * 90)
-	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png("res://docs/radial-menu-preview.png")
-	var before: int = int(Sim.machines[uid].recipe)
 	_release(Vector2.RIGHT * 90)
-	assert(int(Sim.machines[uid].recipe) != before)
+	assert(game.pause_menu.active and game.pause_menu._preview_id == "propagator")
+	game.pause_menu.close()
 	_open()
 	var escape := InputEventKey.new()
 	escape.keycode = KEY_ESCAPE
@@ -46,10 +53,11 @@ func _ready() -> void:
 	_release(Vector2.DOWN * 90)
 	assert(not Sim.machines.has(uid))
 	_open()
-	assert(game.radial.options[1].action == "clear")
+	assert(game.radial.options[1].action == "plant")
 	_drag(Vector2.RIGHT * 90)
 	_release(Vector2.RIGHT * 90)
-	assert(Land.get_parcel("forest",cell).attachment_cleared)
+	assert(Sim.growth_at("forest",cell).stage == "phase1")
+	Sim._tick_life_growth(5.0)
 	_open()
 	assert(not game.radial.options[1].enabled)
 	_drag(Vector2.RIGHT * 90)

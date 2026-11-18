@@ -1,6 +1,7 @@
 extends Node
 ## Global economy simulation. All four scenes keep running whether or not they are on screen.
 
+signal growth_changed(biome: String)
 signal inventory_changed
 signal stats_changed
 signal machines_changed(biome: String)
@@ -13,6 +14,16 @@ const SAVE_PATH: String = "user://neo_currency_save.json"
 const START_MONEY: int = 400
 const ENERGY_CAP_BASE: float = 400.0
 
+# The two decision windows expire into their default branch. A manual addition
+# branches immediately and starts the full timer for the next phase.
+const GROWTH_PHASES := {
+	"phase1":   {"duration": 5.0,  "timeout": "phase2_1", "add": "phase2_2"},
+	"phase2_1": {"duration": 10.0, "machine": "propagator"},
+	"phase2_2": {"duration": 10.0, "timeout": "phase3_1", "add": "phase3_2"},
+	"phase3_1": {"duration": 10.0, "machine": "collector"},
+	"phase3_2": {"duration": 10.0, "machine": "extractor"},
+}
+
 var running: bool = false
 var paused: bool = false
 var time_scale: float = 1.0
@@ -23,6 +34,7 @@ var money: int = 0
 var reputation: int = 0
 var inventory: Dictionary = {}
 var eternity_records: Dictionary = {}
+var life_growth: Dictionary = {}
 var energy: float = 0.0
 var energy_cap: float = ENERGY_CAP_BASE
 var energy_in_rate: float = 0.0
@@ -35,17 +47,18 @@ var weather: Dictionary = {}      # biome -> {"effect": id, "remaining": t}
 var weather_timer: Dictionary = {}
 var delivered: int = 0
 var _rng := RandomNumberGenerator.new()
-var _rate_in_acc: float = 0.0
-var _rate_out_acc: float = 0.0
 var _rate_time: float = 0.0
 
 func _ready() -> void:
 	Land.binding_expired.connect(_on_binding_expired)
+	Land.tide_finished.connect(_on_tide_finished)
+	Land.riverbed_flooded.connect(_on_riverbed_flooded)
 
 # ================================================================ lifecycle
 func new_game(seed_in: int) -> void:
 	seed_value = seed_in
 	eternity_records.clear()
+	life_growth.clear()
 	_rng.seed = hash("sim|%d" % seed_in)
 	Land.generate(seed_in)
 	money = Settings.starting_money
@@ -97,7 +110,7 @@ func give_items(items_in: Dictionary) -> void:
 	inventory_changed.emit()
 
 func is_unlocked(machine_id: String) -> bool:
-	return reputation >= int(Data.machines[machine_id].get("unlock_rep", 0))
+	return Data.machines.has(machine_id) and reputation >= int(Data.machines[machine_id].get("unlock_rep", 0))
 
 func machine_at(biome: String, cell: Vector2i) -> Dictionary:
 	for m: Dictionary in machines.values():
@@ -121,34 +134,126 @@ func repair_cost(m: Dictionary) -> int:
 # ================================================================ commands
 ## Returns "" on success or the reason it cannot be placed.
 func can_place(machine_id: String, biome: String, cell: Vector2i) -> String:
-	if not Data.machines.has(machine_id): return tr("Unknown machine")
-	if not Land.in_grid(cell): return tr("Outside the 11x11 plot")
-	if not machine_at(biome, cell).is_empty(): return tr("Plot already occupied")
-	var def: Dictionary = Data.machines[machine_id]
-	if not is_unlocked(machine_id): return tr("Needs %d reputation") % int(def.unlock_rep)
-	var parcel: Dictionary = Land.get_parcel(biome, cell)
-	if def.get("living", false):
-		if int(parcel.sheet.get("adaptation", [1, 1])[0]) == 0: return "此地块不适合生灵"
-		if count("life") < Land.life_cost(biome, cell): return "生灵不足"
-	if def.kind == "extractor" and str(parcel.deposit) == "": return tr("Must stand on a deposit")
-	if money < int(def.cost): return tr("Not enough money")
-	if not has_items(def.get("materials", {})): return tr("Missing ") + Data.counts_text(def.materials)
+	return tr("Plant Life on a plot to grow a machine")
+
+func growth_at(biome: String, cell: Vector2i) -> Dictionary:
+	return life_growth.get(Land.parcel_key(biome,cell), {})
+
+func can_add_life(biome: String, cell: Vector2i) -> String:
+	if not Data.biomes.has(biome) or not Land.in_grid(cell): return tr("Choose a plot")
+	if not machine_at(biome, cell).is_empty(): return tr("This plot already has a machine")
+	var g := growth_at(biome, cell)
+	var sheet: Dictionary = Land.get_parcel(biome, cell).sheet
+	if int(sheet.get("support", 0)) < 1: return tr("Requires ground support %d") % 1
+	if g.is_empty():
+		if int(sheet.get("adaptation", [1, 1])[0]) == 0:
+			return tr("Life cannot take root here")
+	else:
+		if not GROWTH_PHASES[g.stage].has("add"): return tr("Growth branch already chosen")
+		var target: String = GROWTH_PHASES[GROWTH_PHASES[g.stage].add].get("machine", "")
+		if target != "":
+			var reason := machine_site_reason(target, biome, cell)
+			if reason != "": return reason
+	if count("life") < 1: return tr("Not enough Life points")
 	return ""
 
-func place_machine(machine_id: String, biome: String, cell: Vector2i) -> String:
-	var reason: String = can_place(machine_id, biome, cell)
+func _enter_growth_phase(g: Dictionary, phase: String) -> void:
+	var rule: Dictionary = GROWTH_PHASES[phase]
+	g.stage = phase
+	g.remaining = rule.duration
+	g.machine = rule.get("machine", "")
+	g.erase("blocked")
+
+func add_life_point(biome: String, cell: Vector2i) -> String:
+	var reason := can_add_life(biome, cell)
 	if reason != "": return reason
-	var def: Dictionary = Data.machines[machine_id]
-	money -= int(def.cost)
-	if def.get("living", false): take_items({"life": Land.life_cost(biome, cell)})
-	take_items(def.get("materials", {}))
-	var m: Dictionary = _make_machine(machine_id, biome, cell, next_uid)
-	next_uid += 1
-	machines[m.uid] = m
-	_bind_aura(m)
-	stats_changed.emit()
-	machines_changed.emit(biome)
+	var g := growth_at(biome, cell)
+	if g.is_empty():
+		g = {"biome": biome, "cell": [cell.x, cell.y]}
+		_enter_growth_phase(g, "phase1")
+		life_growth[Land.parcel_key(biome, cell)] = g
+	else:
+		_enter_growth_phase(g, GROWTH_PHASES[g.stage].add)
+	take_items({"life": 1})
+	growth_changed.emit(biome)
 	return ""
+
+func _tick_life_growth(dt: float) -> void:
+	if dt < 0.0: return
+	for key: String in life_growth.keys():
+		var g: Dictionary = life_growth[key]
+		var budget := dt
+		while true:
+			var remaining: float = g.remaining
+			if remaining - budget > 0.000000001:
+				g.remaining = remaining - budget
+				break
+			budget = maxf(0.0, budget - remaining)
+			var rule: Dictionary = GROWTH_PHASES[g.stage]
+			if rule.has("timeout"):
+				_enter_growth_phase(g, rule.timeout)
+				growth_changed.emit(g.biome)
+				continue
+			var cell := Vector2i(int(g.cell[0]), int(g.cell[1]))
+			var blocked := machine_site_reason(g.machine, g.biome, cell)
+			if not machine_at(g.biome, cell).is_empty(): blocked = tr("This plot already has a machine")
+			if blocked != "":
+				g.remaining = 0.0
+				if g.get("blocked", "") != blocked:
+					g.blocked = blocked
+					growth_changed.emit(g.biome)
+				break
+			life_growth.erase(key)
+			var m := _make_machine(g.machine, g.biome, cell, next_uid)
+			next_uid += 1
+			machines[m.uid] = m
+			_bind_aura(m)
+			machines_changed.emit(g.biome)
+			growth_changed.emit(g.biome)
+			break
+
+func growth_text(g: Dictionary) -> String:
+	var remaining := float(g.get("remaining", 0.0))
+	if g.has("blocked"):
+		return tr("%s ready · waiting for site\n%s") % [Data.machines[g.machine].name, g.blocked]
+	match str(g.get("stage", "")):
+		"phase1": return tr("Phase 1 · %.1fs left\nWait for 2-1, or add 1 Life for 2-2") % remaining
+		"phase2_2": return tr("Phase 2-2 · %.1fs left\nWait for 3-1, or add 1 Life for 3-2") % remaining
+	if Data.machines.has(g.get("machine", "")):
+		return tr("Growing %s · %.1fs left") % [Data.machines[g.machine].name, remaining]
+	return ""
+
+func restore_life_growth(saved: Dictionary) -> void:
+	life_growth.clear()
+	for raw: Variant in saved.values():
+		if not raw is Dictionary: continue
+		var biome := str(raw.get("biome", ""))
+		var coords: Variant = raw.get("cell", [])
+		if not Data.biomes.has(biome) or not coords is Array or coords.size() != 2: continue
+		var cell := Vector2i(int(coords[0]), int(coords[1]))
+		if not Land.in_grid(cell) or not machine_at(biome, cell).is_empty(): continue
+		var phase := str(raw.get("stage", ""))
+		var seconds := float(raw.get("remaining", 0.0))
+		# In the first save format, stage1/stage2/mature each held one Life;
+		# both partially grown machine routes had already consumed a second.
+		match phase:
+			"stage1": phase = "phase1"
+			"stage2": phase = "phase2_1"
+			"mature":
+				phase = "phase2_1"
+				seconds = 0.0
+			"machine":
+				if raw.get("machine", "") not in ["pitcher_still", "leafwing_turbine"]: continue
+				phase = "phase3_1"
+		if not GROWTH_PHASES.has(phase): continue
+		var g := {"biome": biome, "cell": [cell.x, cell.y]}
+		_enter_growth_phase(g, phase)
+		g.remaining = clampf(seconds, 0.0, float(g.remaining))
+		life_growth[Land.parcel_key(biome, cell)] = g
+	_tick_life_growth(0.0)
+
+func place_machine(machine_id: String, biome: String, cell: Vector2i) -> String:
+	return can_place(machine_id,biome,cell)
 
 func _make_machine(machine_id: String, biome: String, cell: Vector2i, uid: int) -> Dictionary:
 	return {"uid": uid, "type": machine_id, "biome": biome, "cell": cell, "recipe": 0,
@@ -228,12 +333,18 @@ func _order_template(id: String) -> Dictionary:
 		if t.id == id: return t
 	return {}
 
+func _can_supply_order(template: Dictionary) -> bool:
+	for item: String in template.needs:
+		if item not in ["life", "ember"] and count(item) < int(template.needs[item]):
+			return false
+	return true
+
 func _fill_orders() -> void:
 	var guard: int = 0
 	while orders.size() < Data.order_slots and guard < 50:
 		guard += 1
 		var open_ids: Array = orders.map(func(o: Dictionary) -> String: return o.id)
-		var pool: Array = Data.orders.filter(func(t: Dictionary) -> bool: return int(t.min_rep) <= reputation and not open_ids.has(t.id))
+		var pool: Array = Data.orders.filter(func(t: Dictionary) -> bool: return int(t.min_rep) <= reputation and not open_ids.has(t.id) and _can_supply_order(t))
 		if pool.is_empty(): break
 		# Prefer the newest tier a little so progression shows up.
 		var t: Dictionary = pool[_rng.randi_range(0, pool.size() - 1)]
@@ -250,6 +361,7 @@ func step(dt: float) -> void:
 	_tick_weather(dt)
 	_tick_orders(dt)
 	_tick_machines(dt)
+	_tick_life_growth(dt)
 
 func _tick_orders(dt: float) -> void:
 	var changed: bool = false
@@ -288,109 +400,100 @@ func _on_binding_expired(b: Dictionary) -> void:
 		weather_timer[b.biome] = _rng.randf_range(80.0, 150.0)
 		weather_changed.emit(b.biome)
 
+func machine_site_reason(id: String, biome: String, cell: Vector2i) -> String:
+	var p := Land.get_parcel(biome, cell)
+	var def: Dictionary = Data.machines.get(id, {})
+	if p.is_empty() or def.is_empty(): return tr("Invalid machine site")
+	if int(p.sheet.get("support", 0)) < int(def.support):
+		return tr("Requires ground support %d") % int(def.support)
+	if def.has("site_life_min") and int(p.life_concentration) < int(def.site_life_min):
+		return tr("Requires Life concentration of at least %d") % int(def.site_life_min)
+	return ""
+
+func _on_riverbed_flooded(biome: String, cell: Vector2i) -> void:
+	var m := machine_at(biome, cell)
+	if not m.is_empty():
+		machines.erase(m.uid)
+		machines_changed.emit(biome)
+
+func _has_working_plot(biome: String, neighbors: Array[Vector2i]) -> bool:
+	for cell in neighbors:
+		if int(Land.get_parcel(biome, cell).life_concentration) >= 0: return true
+	return false
+
 func _tick_machines(dt: float) -> void:
-	# Pass 1: who wants power this tick?
-	var demand: float = 0.0
-	var plans: Array = []
+	var wave_active := not Land.tide_state.is_empty()
 	for m: Dictionary in machines.values():
-		var def: Dictionary = Data.machines[m.type]
-		var st: Dictionary = machine_stats(m)
-		var plan: Dictionary = {"m": m, "st": st, "def": def, "active": false}
+		var neighbors := Land.machine_neighbors(m.cell, Data.machines[m.type].area)
 		if not m.enabled:
 			m.status = tr("Paused")
-		elif m.jammed:
-			m.status = tr("Jammed - needs repair")
-		elif def.kind == "support":
-			plan.active = true
-			m.status = tr("Radiating")
-		elif float(st.speed) <= 0.001:
-			m.status = tr("Too %s to work") % Data.temperatures[Land.get_parcel(m.biome, m.cell).temperature].name.to_lower()
+		elif not _has_working_plot(m.biome, neighbors):
+			m.status = tr("No plot in range has nonnegative Life concentration")
 		else:
-			if not m.started:
-				var r: Dictionary = recipe_of(m)
-				if has_items(r.get("inputs", {})):
-					take_items(r.get("inputs", {}))
-					m.started = true
-				else:
-					var missing: Array = []
-					for id: String in r.get("inputs", {}):
-						if count(id) < int(r.inputs[id]): missing.append(Data.item_name(id))
-					m.status = tr("Waiting for ") + ", ".join(missing)
-			if m.started:
-				plan.active = true
-				m.status = tr("Working")
-		if plan.active:
-			demand += float(def.get("power", 0.0)) * float(st.energy) * dt
-		plans.append(plan)
-	power_ratio = 1.0 if demand <= 0.0001 else clampf(energy / demand, 0.0, 1.0)
-	energy -= demand * power_ratio
-	_rate_out_acc += demand * power_ratio
-	# Pass 2: advance work.
-	var touched: Dictionary = {}
-	for plan: Dictionary in plans:
-		if not plan.active or plan.def.kind == "support": continue
-		var m: Dictionary = plan.m
-		var st: Dictionary = plan.st
-		var r: Dictionary = recipe_of(m)
-		var ratio: float = power_ratio if float(plan.def.get("power", 0.0)) > 0.0 else 1.0
-		if ratio < 0.999: m.status = tr("Low energy (%d%%)") % int(ratio * 100.0)
-		m.progress = float(m.progress) + dt * float(st.speed) * ratio / maxf(float(r.get("duration", 1.0)), 0.1)
-		if float(m.progress) >= 1.0:
-			_finish_cycle(m, st, r)
-			touched[m.biome] = true
-	energy = clampf(energy, 0.0, energy_cap)
+			m.status = tr("Working") if wave_active else tr("Waiting for tide")
+		m.progress = (float(Land.tide_state.get("row", 0)) / Land.GRID) if wave_active and m.enabled else 0.0
 	_rate_time += dt
 	if _rate_time >= 1.0:
-		energy_in_rate = _rate_in_acc / _rate_time
-		energy_out_rate = _rate_out_acc / _rate_time
-		_rate_in_acc = 0.0
-		_rate_out_acc = 0.0
 		_rate_time = 0.0
 		stats_changed.emit()
-	for b: String in touched: machines_changed.emit(b)
 
-func _finish_cycle(m: Dictionary, st: Dictionary, r: Dictionary) -> void:
-	var def: Dictionary = Data.machines[m.type]
-	var outputs: Dictionary = r.get("outputs", {}).duplicate()
-	if def.kind == "extractor":
-		var dep: String = str(Land.get_parcel(m.biome, m.cell).deposit)
-		if dep != "": outputs = {dep: 1}
-	var produced: Dictionary = {}
-	for id: String in outputs:
-		var amount: float = float(outputs[id]) * float(st["yield"]) + float(m.carry.get(id, 0.0))
-		var whole: int = int(floor(amount))
-		m.carry[id] = amount - whole
-		if whole > 0: produced[id] = whole
-	if not produced.is_empty(): give_items(produced)
-	var e_out: float = float(r.get("energy_out", 0.0)) * float(st["yield"])
-	if e_out > 0.0:
-		energy = minf(energy + e_out, energy_cap)
-		_rate_in_acc += e_out
-	m.wear = float(m.wear) + float(def.get("wear", 0.0)) * float(st.wear)
-	if float(m.wear) >= 100.0:
-		m.wear = 100.0
-		m.jammed = true
-		toast.emit(tr("%s jammed in the %s") % [def.name, Data.biome_name(m.biome)], Color("e88a6a"))
-	m.progress = 0.0
-	m.started = false
-	m.cycles = int(m.cycles) + 1
-	m.last_output = produced
-	machine_cycled.emit(m.uid)
+func _on_tide_finished() -> void:
+	# Resolve all seeding before reading the collectors' totals. Extractors
+	# sharing plots draw in UID order, including after restoring a save.
+	var ids: Array = machines.keys()
+	ids.sort()
+	var changed: Dictionary = {}
+	for type: String in ["propagator", "collector", "extractor"]:
+		var def: Dictionary = Data.machines[type]
+		for uid: int in ids:
+			var m: Dictionary = machines[uid]
+			if m.type != type: continue
+			m.last_output = {}
+			if not m.enabled: continue
+			var neighbors := Land.machine_neighbors(m.cell, def.area)
+			if not _has_working_plot(m.biome, neighbors): continue
+			match type:
+				"propagator":
+					for cell in neighbors: Land.seed_plot(m.biome, cell)
+					m.cycles = int(m.cycles) + neighbors.size()
+				"collector":
+					var concentration := 0
+					for cell in neighbors:
+						concentration += int(Land.get_parcel(m.biome, cell).life_concentration)
+					_credit_tide_output(m, "life", floori(maxi(0, concentration) / 8.0))
+				"extractor":
+					var extracted := int(m.carry.get("concentration", 0))
+					for cell in neighbors:
+						if int(Land.get_parcel(m.biome, cell).life_concentration) > 0:
+							Land.change_concentration(m.biome, cell, -1)
+							extracted += 1
+					m.carry.concentration = extracted % 8
+					_credit_tide_output(m, "liquid_energy_canister", floori(extracted / 8.0))
+			changed[m.biome] = true
+			machine_cycled.emit(uid)
+	for biome: String in changed: machines_changed.emit(biome)
+
+func _credit_tide_output(m: Dictionary, item: String, quantity: int) -> void:
+	if quantity <= 0: return
+	m.cycles = int(m.cycles) + quantity
+	m.last_output = {item: quantity}
+	give_items(m.last_output)
 
 # ================================================================ save / load
-func save_game() -> bool:
+func save_game(path: String = SAVE_PATH) -> bool:
 	var ms: Array = []
 	for m: Dictionary in machines.values():
 		ms.append({"uid": m.uid, "type": m.type, "biome": m.biome, "cell": [m.cell.x, m.cell.y], "recipe": m.recipe,
-			"progress": m.progress, "started": m.started, "wear": m.wear, "jammed": m.jammed, "enabled": m.enabled, "carry": m.carry, "cycles": m.cycles})
-	var data: Dictionary = {"version": 1, "seed": seed_value, "time": game_time, "money": money, "reputation": reputation,
-		"inventory": inventory, "energy": energy, "machines": ms, "next_uid": next_uid, "orders": orders,
+			"progress": m.progress, "started": m.started, "wear": m.wear, "jammed": m.jammed, "enabled": m.enabled,
+			"carry": m.carry, "cycles": m.cycles, "last_output": m.get("last_output", {})})
+	var data: Dictionary = {"version": 2, "seed": seed_value, "time": game_time, "money": money, "reputation": reputation,
+		"life_growth": life_growth, "inventory": inventory, "energy": energy, "machines": ms, "next_uid": next_uid, "orders": orders,
 		"weather": weather, "weather_timer": weather_timer, "weather_bindings": Land.save_bindings(), "delivered": delivered,
 		"energy_offsets": Land.energy_offsets, "eternity_records": eternity_records,
 		"terrain_overrides": Land.terrain_overrides, "tide_state": Land.tide_state,
 		"tide_elapsed": Land.tide_elapsed, "tide_count": Land.tide_count,
 		"cleared_attachments": Land.cleared, "rng_state": str(_rng.state)}
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null: return false
 	f.store_string(JSON.stringify(data, "\t"))
 	f.close()
@@ -400,15 +503,18 @@ func save_game() -> bool:
 static func has_save() -> bool:
 	return FileAccess.file_exists(SAVE_PATH)
 
-func load_game() -> bool:
-	if not has_save(): return false
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+func load_game(path: String = SAVE_PATH) -> bool:
+	if not FileAccess.file_exists(path): return false
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
 	if not parsed is Dictionary: return false
 	var d: Dictionary = parsed
 	seed_value = int(d.get("seed", 0))
 	Land.generate(seed_value)
 	Land.energy_offsets = d.get("energy_offsets", {})
 	eternity_records = d.get("eternity_records", {})
+	for record: Dictionary in eternity_records.values():
+		var recorded: Dictionary = record.get("machine", {})
+		if not Data.machines.has(recorded.get("type", "")): record.machine = {}
 	Land.restore_terrain(d.get("terrain_overrides", {}))
 	Land.tide_state = d.get("tide_state", {})
 	Land.tide_elapsed = float(d.get("tide_elapsed", 0.0))
@@ -425,23 +531,34 @@ func load_game() -> bool:
 	energy = float(d.get("energy", 0.0))
 	energy_cap = ENERGY_CAP_BASE
 	machines.clear()
+	next_uid = maxi(1, int(d.get("next_uid", 1)))
 	for raw: Dictionary in d.get("machines", []):
-		if not Data.machines.has(str(raw.type)): continue
-		var m: Dictionary = _make_machine(str(raw.type), str(raw.biome), Vector2i(int(raw.cell[0]), int(raw.cell[1])), int(raw.uid))
-		for k: String in ["recipe", "progress", "started", "wear", "jammed", "enabled", "carry", "cycles"]:
+		if not Data.machines.has(raw.get("type", "")) or not Data.biomes.has(raw.get("biome", "")): continue
+		var coords: Variant = raw.get("cell", [])
+		if not coords is Array or coords.size() != 2: continue
+		var cell := Vector2i(int(coords[0]), int(coords[1]))
+		var uid := int(raw.get("uid", 0))
+		if not Land.in_grid(cell) or uid < 1 or machines.has(uid) or not machine_at(raw.biome, cell).is_empty(): continue
+		var m := _make_machine(raw.type, raw.biome, cell, uid)
+		next_uid = maxi(next_uid, uid + 1)
+		for k: String in ["recipe", "progress", "started", "wear", "jammed", "enabled", "carry", "cycles", "last_output"]:
 			if raw.has(k): m[k] = raw[k]
 		m.recipe = int(m.recipe)
 		machines[m.uid] = m
 		_bind_aura(m)
-	next_uid = int(d.get("next_uid", machines.size() + 1))
-	orders = d.get("orders", [])
+	orders.clear()
+	for order: Dictionary in d.get("orders", []):
+		if not _order_template(str(order.get("id", ""))).is_empty(): orders.append(order)
+	_fill_orders()
 	weather = d.get("weather", {})
 	weather_timer = d.get("weather_timer", {})
 	for wb: Dictionary in d.get("weather_bindings", []):
+		if not Data.biomes.has(wb.get("biome", "")) or wb.get("source_id", "") != "weather:" + str(wb.biome): continue
 		Land.bind_effect(str(wb.effect), str(wb.biome), Vector2i(5, 5), -1, "weather", str(wb.source_id), float(wb.remaining))
 	delivered = int(d.get("delivered", 0))
 	paused = false
 	time_scale = 1.0
+	restore_life_growth(d.get("life_growth", {}))
 	running = true
 	_emit_all()
 	return true
@@ -473,7 +590,8 @@ func reshape_eternity(biome: String, cell: Vector2i) -> void:
 	if not eternity_records.has(key) or float(Land.get_parcel(biome, cell).elements.eternity) <= 0: return
 	var saved: Dictionary = eternity_records[key]
 	var current: Dictionary = machine_at(biome, cell)
-	var machine: Dictionary = saved.machine.duplicate(true)
+	var machine: Dictionary = saved.get("machine", {}).duplicate(true)
+	if not Data.machines.has(machine.get("type", "")): machine = {}
 	if not machine.is_empty() and (current.is_empty() or current.type != machine.type):
 		var def: Dictionary = Data.machines[machine.type]
 		if money < int(def.cost) or not has_items(def.get("materials", {})):
@@ -494,6 +612,7 @@ func reshape_eternity(biome: String, cell: Vector2i) -> void:
 	if saved.cleared: Land.cleared[key] = true
 	else: Land.cleared.erase(key)
 	if not machine.is_empty():
+		life_growth.erase(key)
 		machine.uid = next_uid
 		next_uid += 1
 		machine.cell = cell

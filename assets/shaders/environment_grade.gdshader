@@ -1,21 +1,36 @@
 shader_type canvas_item;
-uniform sampler2D screen_texture : hint_screen_texture, filter_nearest;
-uniform float bloom_strength = 0.10;
+render_mode unshaded;
+uniform sampler2D screen_texture : hint_screen_texture, filter_nearest, repeat_disable;
+uniform float bloom_strength : hint_range(0.0, 1.0) = 0.12;
+uniform vec4 shadow_color : source_color = vec4(0.16, 0.19, 0.34, 1.0);
+uniform vec4 highlight_color : source_color = vec4(1.0, 0.85, 0.77, 1.0);
+
+float luminance(vec3 c) {
+	return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+vec3 hot_pixel(vec2 uv) {
+	vec3 c = textureLod(screen_texture, uv, 0.0).rgb;
+	float brightness = mix(luminance(c), max(c.r, max(c.g, c.b)), 0.35);
+	return c * smoothstep(0.76, 0.97, brightness);
+}
+
 void fragment() {
-	vec2 size = vec2(textureSize(screen_texture, 0));
-	// Keep native-resolution silhouettes and material edges. Pixel clusters belong in the artwork.
+	// Preserve each rasterized pixel. The terrain art and faceted materials
+	// supply the pixel shapes; grading only changes their colour.
 	vec2 uv = SCREEN_UV;
-	vec3 base = texture(screen_texture, uv).rgb;
-	vec3 bloom = vec3(0.0);
-	for (int x = -2; x <= 2; x++) {
-		for (int y = -2; y <= 2; y++) {
-			vec3 c = texture(screen_texture, uv + vec2(float(x),float(y)) * 3.0 / size).rgb;
-			bloom += max(c - vec3(0.88), vec3(0.0)) / 25.0;
-		}
-	}
-	vec3 color = base + bloom * bloom_strength;
-	float shade = 1.0 - smoothstep(0.24, 0.79, distance(SCREEN_UV, vec2(0.5))) * 0.23;
-	color *= shade;
-	color += vec3(0.012, 0.006, 0.025) * (1.0 - dot(base,vec3(0.333)));
+	vec3 base = textureLod(screen_texture, uv, 0.0).rgb;
+	float radius = clamp(round(1.0 / (540.0 * SCREEN_PIXEL_SIZE.y)), 1.0, 4.0);
+	vec2 dx = vec2(SCREEN_PIXEL_SIZE.x * radius, 0.0);
+	vec2 dy = vec2(0.0, SCREEN_PIXEL_SIZE.y * radius);
+	vec3 glow = 0.25 * (hot_pixel(uv + dx) + hot_pixel(uv - dx)
+		+ hot_pixel(uv + dy) + hot_pixel(uv - dy));
+	float luma = luminance(base);
+	vec3 color = base + (shadow_color.rgb - luminance(shadow_color.rgb)) * 0.30 * (1.0 - smoothstep(0.10, 0.56, luma));
+	color += (highlight_color.rgb - luminance(highlight_color.rgb)) * 0.09 * smoothstep(0.40, 0.92, luma);
+	color += glow * bloom_strength * (1.0 - luma);
+	color = mix(color, floor(color * 63.0 + 0.5) / 63.0, 0.5);
+	vec2 perimeter = (uv - 0.5) * vec2(1.85, 1.65);
+	color *= 1.0 - 0.15 * smoothstep(0.36, 1.15, dot(perimeter, perimeter));
 	COLOR = vec4(color, 1.0);
 }
