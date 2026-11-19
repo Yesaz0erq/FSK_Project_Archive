@@ -66,8 +66,8 @@ func build(biome: String, seed_value: int, terrain: Node3D) -> void:
 
 func _place(batches: Dictionary, terrain: Node3D, kind: String, p: Vector2, size: float) -> void:
 	var clearance := maxf(absf(p.x), absf(p.y)) - PLOT_EDGE
-	if clearance < 0.62 or terrain.is_water_at(p.x, p.y): return
-	if absf(p.y + 14.0) < 1.75 and absf(p.x) < 7.5: return
+	if clearance < 0.62 or terrain.is_channel_at(p.x, p.y): return
+	if terrain.is_crossing_at(p.x, p.y): return
 	var y: float = terrain.height_at(p.x, p.y)
 	var key := "%s_%d" % [kind, _locations.randi_range(0, 2)]
 	if not _models.has(key): _models[key] = _model(kind, key)

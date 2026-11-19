@@ -523,7 +523,7 @@ func _refresh_inspector() -> void:
 	var rule: Dictionary = p.get("sheet", {})
 	if not rule.is_empty():
 		_inspect_box.add_child(UITheme.label("基础：%s · 等级 %s · %s生成" % [rule.base, rule.level, rule.generation], 13))
-		_inspect_box.add_child(UITheme.label("潮汐：%s · 补正（生灵/余烬）：%s/%s" % [rule.tide, rule.correction[0], rule.correction[1]], 12))
+		_inspect_box.add_child(UITheme.label("潮汐：%s · 补正（生灵/余烬）：%s/%s" % [rule.get("tide_description", rule.tide), rule.correction[0], rule.correction[1]], 12))
 		_inspect_box.add_child(UITheme.label("适应度（生灵/余烬）：%s/%s" % [rule.adaptation[0], rule.adaptation[1]], 12))
 		var attachment: String = str(rule.attachment)
 		if attachment != "/":

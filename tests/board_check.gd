@@ -11,13 +11,17 @@ func _ready() -> void:
 	for b: String in Data.biome_order:
 		var river: Dictionary = {}
 		for y in range(11):
-			var count: int = 0
 			for x in range(11):
 				var p: Dictionary = Land.get_parcel(b, Vector2i(x,y))
 				if p.land == "sheet_river":
 					river[Vector2i(x,y)] = true
-					count += 1
-			assert(count > 0)
+		var mouths: Array = Land.river_mouths[b]
+		assert(mouths.size() == 2)
+		for mouth: Dictionary in mouths:
+			var border := 0 if mouth.edge in [0, 2] else Land.GRID - 1
+			for index in range(mouth.first, mouth.last + 1):
+				var cell := Vector2i(border, index) if mouth.edge < 2 else Vector2i(index, border)
+				assert(river.has(cell))
 		var pending: Array = [river.keys()[0]]
 		var visited: Dictionary = {}
 		while not pending.is_empty():
@@ -36,10 +40,11 @@ func _ready() -> void:
 	assert(view._tile_mats[cell].emission_enabled)
 	var screen: Vector2 = view.camera.unproject_position(view._tiles[cell].global_position + Vector3(0,0.31,0))
 	assert(view._pick(screen) == cell)
-	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png("res://docs/board-motion-preview.png")
+	if DisplayServer.get_name() != "headless":
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("res://docs/board-motion-preview.png")
 	view.select_cell(Vector2i(-1,-1))
 	await get_tree().create_timer(0.35).timeout
 	assert(absf(view._tiles[cell].position.y - rest) < 0.02)
-	print("BOARD CHECK OK: 121 blocks, connected central river, entry wave, raised selection, highlight, picking, deselection")
+	print("BOARD CHECK OK: 121 blocks, connected river mouths, entry wave, raised selection, highlight, picking, deselection")
 	get_tree().quit()

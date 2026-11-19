@@ -4,6 +4,7 @@ extends Node3D
 const DistrictLand := preload("res://scripts/world/district_land.gd")
 const DistrictProps := preload("res://scripts/world/district_props.gd")
 const Crossing := preload("res://scripts/world/river_crossing.gd")
+const Fence := preload("res://scripts/world/workspace_fence.gd")
 const Grade := preload("res://assets/shaders/environment_grade.gdshader")
 const Column := preload("res://assets/shaders/sun_column.gdshader")
 
@@ -36,8 +37,11 @@ func build(biome_id: String, seed_value: int) -> void:
 	bridge.name = "UpstreamCrossing"
 	add_child(bridge)
 	bridge.build(biome, land)
+	var fence := Fence.new()
+	fence.name = "WorkspaceFence"
+	add_child(fence)
+	fence.build(biome, land)
 	_grazing_light()
-	_survey_marks()
 	_atmosphere()
 	_pixel_pass()
 
@@ -115,15 +119,6 @@ func _grazing_light() -> void:
 		pool.spot_angle_attenuation = 1.5
 		pool.light_color = colors[biome][i]
 		pool.light_energy = 1.25 if i == 0 else 1.70
-
-func _survey_marks() -> void:
-	# Low corner pegs make the planting limit legible without fencing the valley.
-	for x: float in [-9.03, 9.03]:
-		for z: float in [-9.03, 9.03]:
-			var h: float = land.height_at(x,z)
-			var p := Vector3(x,h,z)
-			MeshKit.cyl(self,p + Vector3.UP*0.09,0.095,0.13,0.36,Color("776e62"),6)
-			MeshKit.cyl(self,p + Vector3.UP*0.29,0.12,0.11,0.075,Color("e2bd87"),6)
 
 func _atmosphere() -> void:
 	# Finite shafts are world volumes; both ends remain fixed as the camera turns.

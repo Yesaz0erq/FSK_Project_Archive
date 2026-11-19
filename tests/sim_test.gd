@@ -10,6 +10,7 @@ func check(condition: bool, label: String) -> void:
 		push_error(label)
 
 func _ready() -> void:
+	_check_river_cycle()
 	Sim.new_game(2026)
 	Sim.paused = true
 	check(Data.machines.size() == 3, "Only the three FT1 flora machines are registered")
@@ -24,7 +25,7 @@ func _ready() -> void:
 				all_plots[Land.parcel_key(b, Vector2i(x, y))] = "sheet_burnt"
 	var test_cell := Vector2i(0, 1)
 	var site_key := Land.parcel_key(BIOME, test_cell)
-	for id: String in ["sheet_river", "sheet_oasis"]:
+	for id: String in ["sheet_river", "sheet_river_low", "sheet_oasis"]:
 		all_plots[site_key] = id
 		Land.restore_terrain(all_plots)
 		for machine: String in Data.machines:
@@ -77,11 +78,13 @@ func _ready() -> void:
 	Land.start_tide()
 	Sim.step(2.24)
 	var wave_row: int = Land.tide_state.row
+	var mouths := Land.river_mouths.duplicate(true)
 	var corner_uid: int = corner_pump.uid
 	var cans_before := Sim.count("liquid_energy_canister")
 	check(Sim.save_game(saved_path), "Can save mid-wave")
 	Sim.new_game(7)
 	check(Sim.load_game(saved_path), "Can restore mid-wave")
+	check(Land.generation_version == Land.GENERATOR_VERSION and Land.river_mouths == mouths, "River course survives reload")
 	check(Land.tide_state.row == wave_row and Sim.count("liquid_energy_canister") == cans_before, "Loading does not settle an unfinished tide")
 	check(Sim.machines[corner_uid].carry.concentration == 1 and Land.get_parcel(BIOME, seeded).stabilized, "Stored concentration, stability, and machine carry survive loading")
 	Sim.step(5.5)
@@ -106,3 +109,41 @@ func _machine(id: String, cell: Vector2i) -> Dictionary:
 func _full_tide() -> void:
 	Land.start_tide()
 	Sim.step(Land.TIDE_ROW_SECONDS * Land.GRID + 0.01)
+
+func _check_river_cycle() -> void:
+	var axes := {}
+	var mouth_locations := {}
+	for seed_value: int in [7, 47, 149, 2026]:
+		Sim.new_game(seed_value)
+		for b: String in Data.biome_order:
+			var mouth: Dictionary = Land.river_mouths[b][0]
+			axes[mouth.edge] = true
+			mouth_locations[mouth.first] = true
+	check(axes.size() == 2 and mouth_locations.size() >= 3, "Seeds change the river axis and the inlet position")
+	var full_water := {}
+	for y in Land.GRID:
+		for x in Land.GRID:
+			var cell := Vector2i(x, y)
+			if Land.get_parcel(BIOME, cell).land == "sheet_river": full_water[cell] = true
+	var mouths := Land.river_mouths.duplicate(true)
+	_full_tide()
+	var channel := {}
+	var banks := 0
+	for cell: Vector2i in full_water:
+		var id: String = Land.get_parcel(BIOME, cell).land
+		if id == "sheet_river_low": channel[cell] = true
+		elif id == "sheet_riverbed": banks += 1
+	check(not channel.is_empty() and banks > 0 and banks + channel.size() == full_water.size(), "Ebb exposes banks and leaves water in the channel")
+	var open: Array = channel.keys().slice(0, 1)
+	var visited := {}
+	while not open.is_empty():
+		var cell: Vector2i = open.pop_back()
+		if visited.has(cell): continue
+		visited[cell] = true
+		for neighbor in Land.machine_neighbors(cell, "adjacent"):
+			if channel.has(neighbor): open.append(neighbor)
+	check(visited.size() == channel.size(), "The low-water channel remains connected")
+	_full_tide()
+	for cell: Vector2i in full_water:
+		check(Land.get_parcel(BIOME, cell).land == "sheet_river", "Flood restores the original water surface")
+	check(Land.river_mouths == mouths, "Tides preserve the original river course")

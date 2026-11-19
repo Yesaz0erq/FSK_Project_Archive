@@ -17,12 +17,16 @@ void fragment() {
 	vec2 p = floor(ground * 32.0) / 32.0;
 	float strength;
 	vec3 pigment = reflected_sky.rgb;
-	if (family < 2) {
+	if (family < 2 || family == 4) {
 		float wave = sin(p.y * 13.6 - TIME * 1.54 + sin(p.x * 3.8 + TIME * 0.41));
 		float window = sin(p.x * 3.2 + sin(p.y * 2.7 + TIME * .26)) * .5 + .5;
 		float streak = smoothstep(.78, .99, wave) * smoothstep(.35, .94, window);
 		float wide = .5 + .5 * sin(p.x * 1.12 + p.y * .5 + TIME * .21);
 		strength = streak * (.12 + .30 * wide);
+		if (family == 4) {
+			float depth = texture(paint, atlas_corner + UV * atlas_span).a;
+			strength *= .52 * smoothstep(.24, .85, depth);
+		}
 		if (family == 1) {
 			float pool = length((UV - vec2(.5)) / vec2(.410, .347));
 			strength *= 1.0 - smoothstep(.75, .87, pool);

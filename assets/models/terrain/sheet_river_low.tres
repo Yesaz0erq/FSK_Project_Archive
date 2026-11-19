@@ -1,0 +1,91 @@
+[gd_resource type="ArrayMesh" format=4]
+
+[ext_resource type="Texture2D" path="res://assets/terrain/sheet_river_low_top.png" id="1_td03u"]
+[ext_resource type="Texture2D" path="res://assets/terrain/parcel_corner.svg" id="2_8r4sq"]
+[ext_resource type="Texture2D" path="res://assets/terrain/sheet_riverbed_side.svg" id="3_5bj06"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_q16q5"]
+resource_name = "sheet_river_low_top"
+albedo_texture = ExtResource("1_td03u")
+metallic_specular = 0.18
+roughness = 0.66
+detail_enabled = true
+detail_uv_layer = 1
+detail_albedo = ExtResource("2_8r4sq")
+uv1_scale = Vector3(0.4921875, 0.4921875, 1)
+uv1_offset = Vector3(0.00390625, 0.00390625, 0)
+texture_filter = 4
+texture_repeat = false
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_udpo8"]
+resource_name = "sheet_river_low_side"
+albedo_texture = ExtResource("3_5bj06")
+metallic_specular = 0.18
+roughness = 0.96
+uv1_scale = Vector3(0.2421875, 0.2421875, 1)
+uv1_offset = Vector3(0.00390625, 0.00390625, 0)
+texture_filter = 4
+texture_repeat = false
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5lvxt"]
+resource_name = "sheet_river_low_black_bottom"
+shading_mode = 0
+albedo_color = Color(0, 0, 0, 1)
+
+[resource]
+resource_name = "sheet_river_low_six_faces"
+_surfaces = [{
+"aabb": AABB(-0.765, 0.31, -0.765, 1.53, 1e-05, 1.53),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAACAPwAAAAAAAIA/AACAPwAAgD8AAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAIA/AACAPwAAgD8AAAAAAACAPwAAAAAAAIA/"),
+"format": 34359738423,
+"material": SubResource("StandardMaterial3D_q16q5"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("CtdDv1K4nj4K10O/CtdDP1K4nj4K10O/CtdDP1K4nj4K10M/CtdDv1K4nj4K10O/CtdDP1K4nj4K10M/CtdDv1K4nj4K10M//3///wAA/7//f///AAD/v/9///8AAP+//3///wAA/7//f///AAD/v/9///8AAP+/")
+}, {
+"aabb": AABB(-0.765, -0.31, 0.735, 1.53, 0.62, 0.029999971),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AAAAAAAAgD8AAIA/AAAAAAAAAAAAAIA/AACAPwAAAAAAAIA/"),
+"format": 34359738391,
+"material": SubResource("StandardMaterial3D_udpo8"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("CtdDv1K4nj4K10M/CtdDP1K4nj4K10M/9ig8P1K4nr72KDw/CtdDv1K4nj4K10M/9ig8P1K4nr72KDw/9ig8v1K4nr72KDw//3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA")
+}, {
+"aabb": AABB(-0.765, -0.31, -0.765, 1.53, 0.62, 0.029999971),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AAAAAAAAgD8AAIA/AAAAAAAAAAAAAIA/AACAPwAAAAAAAIA/"),
+"format": 34359738391,
+"material": SubResource("StandardMaterial3D_udpo8"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("CtdDP1K4nj4K10O/CtdDv1K4nj4K10O/9ig8v1K4nr72KDy/CtdDP1K4nj4K10O/9ig8v1K4nr72KDy/9ig8P1K4nr72KDy///////9/AID//////38AgP//////fwCA//////9/AID//////38AgP//////fwCA")
+}, {
+"aabb": AABB(0.735, -0.31, -0.765, 0.029999971, 0.62, 1.53),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AAAAAAAAgD8AAIA/AAAAAAAAAAAAAIA/AACAPwAAAAAAAIA/"),
+"format": 34359738391,
+"material": SubResource("StandardMaterial3D_udpo8"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("CtdDP1K4nj4K10M/CtdDP1K4nj4K10O/9ig8P1K4nr72KDy/CtdDP1K4nj4K10M/9ig8P1K4nr72KDy/9ig8P1K4nr72KDw/////f/9//7////9//3//v////3//f/+/////f/9//7////9//3//v////3//f/+/")
+}, {
+"aabb": AABB(-0.765, -0.31, -0.765, 0.029999971, 0.62, 1.53),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AAAAAAAAgD8AAIA/AAAAAAAAAAAAAIA/AACAPwAAAAAAAIA/"),
+"format": 34359738391,
+"material": SubResource("StandardMaterial3D_udpo8"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("CtdDv1K4nj4K10O/CtdDv1K4nj4K10M/9ig8v1K4nr72KDw/CtdDv1K4nj4K10O/9ig8v1K4nr72KDw/9ig8v1K4nr72KDy/AAD/f/9//78AAP9//3//vwAA/3//f/+/AAD/f/9//78AAP9//3//vwAA/3//f/+/")
+}, {
+"aabb": AABB(-0.735, -0.31, -0.735, 1.47, 1e-05, 1.47),
+"attribute_data": PackedByteArray("AAAAAAAAAAAAAIA/AAAAAAAAgD8AAIA/AAAAAAAAAAAAAIA/AACAPwAAAAAAAIA/"),
+"format": 34359738391,
+"material": SubResource("StandardMaterial3D_5lvxt"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 6,
+"vertex_data": PackedByteArray("9ig8v1K4nr72KDw/9ig8P1K4nr72KDw/9ig8P1K4nr72KDy/9ig8v1K4nr72KDw/9ig8P1K4nr72KDy/9ig8v1K4nr72KDy//38AAAAA/7//fwAAAAD/v/9/AAAAAP+//38AAAAA/7//fwAAAAD/v/9/AAAAAP+/")
+}]

@@ -542,18 +542,55 @@
         "attachment": "/",
         "presence": "/",
         "departure": "/",
-        "flip_to": "sheet_riverbed"
+        "flip_to": "sheet_riverbed",
+        "tide_description": "退为浅水或河床"
       },
       "environment": {
         "heat": 40,
         "moisture": 95
       }
     },
+    "sheet_river_low": {
+      "biome": "forest",
+      "name": "低水位河流",
+      "color": "#538c91",
+      "height": -0.23,
+      "elements": {
+        "life": 72,
+        "ember": 40,
+        "silence": 0,
+        "eternity": 0
+      },
+      "richness": 1,
+      "stability": 0.6,
+      "conductivity": 1.2,
+      "fertility": 0.9,
+      "resources": {
+        "water": 4
+      },
+      "sheet": {
+        "base": "水域",
+        "generation": "线",
+        "level": "1",
+        "support": 0,
+        "rule": "退潮后形成",
+        "tide": "回涨为河流",
+        "correction": [0, 0],
+        "adaptation": [0, 0],
+        "attachment": "/",
+        "presence": "/",
+        "departure": "/"
+      },
+      "environment": {
+        "heat": 40,
+        "moisture": 82
+      }
+    },
     "sheet_riverbed": {
       "biome": "desert",
       "name": "河床",
       "color": "#B07A52",
-      "height": 0.12,
+      "height": -0.29,
       "elements": {
         "life": 8,
         "ember": 56,

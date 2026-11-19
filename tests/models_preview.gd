@@ -21,15 +21,15 @@ func _ready() -> void:
 	camera.position = Vector3(0,10,14)
 	add_child(camera)
 	camera.look_at(Vector3(0,0,0))
-	var ids := ["sheet_sand", "sheet_grass", "sheet_burnt", "sheet_river", "sheet_riverbed", "sheet_oasis"]
-	var names := ["沙地", "草地", "火烧迹地", "河流", "河床", "绿洲"]
-	for i in range(6):
+	var ids := ["sheet_sand", "sheet_grass", "sheet_burnt", "sheet_oasis", "sheet_river", "sheet_river_low", "sheet_riverbed"]
+	var names := ["沙地", "草地", "火烧迹地", "绿洲", "河流", "低水位河流", "河床"]
+	for i in ids.size():
 		var packed: PackedScene = load("res://assets/models/terrain/%s.tscn" % ids[i])
 		var block: MeshInstance3D = packed.instantiate()
 		assert(block.mesh.get_surface_count() == 6)
 		for face in range(6): assert(block.mesh.surface_get_arrays(face)[Mesh.ARRAY_VERTEX].size() == 6)
 		assert(block.mesh.surface_get_material(5).albedo_color == Color.BLACK)
-		block.position = Vector3((i % 3 - 1) * 3.0, 0, (i / 3 - 0.5) * 4.3)
+		block.position = Vector3((i % 4 - (1.5 if i < 4 else 1.0)) * 2.8, 0, (i / 4 - 0.5) * 4.3)
 		block.rotation.y = PI * 0.25
 		add_child(block)
 		var label := Label3D.new()
@@ -43,5 +43,5 @@ func _ready() -> void:
 	for frame in range(15): await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png("res://docs/terrain-models-preview.png")
-	print("MODELS CHECK OK: six models, six closed faces, black bottoms, preview rendered")
+	print("MODELS CHECK OK: seven models, six closed faces, black bottoms, preview rendered")
 	get_tree().quit()

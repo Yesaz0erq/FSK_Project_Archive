@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://assets/models/terrain/sheet_river_low.tres" id="1_jrqnd"]
+
+[node name="sheet_river_low" type="MeshInstance3D" unique_id=1755560264]
+mesh = ExtResource("1_jrqnd")

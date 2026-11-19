@@ -1,8 +1,9 @@
 extends SceneTree
-const IDS := ["sheet_sand", "sheet_grass", "sheet_burnt", "sheet_river", "sheet_riverbed", "sheet_oasis"]
+const IDS := ["sheet_sand", "sheet_grass", "sheet_burnt", "sheet_river", "sheet_river_low", "sheet_riverbed", "sheet_oasis"]
 func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute("res://assets/models/terrain")
 	for id: String in IDS:
+		if not OS.get_cmdline_user_args().is_empty() and id not in OS.get_cmdline_user_args(): continue
 		var top := _material(id, "top")
 		var side := _material(id, "side")
 		var bottom := StandardMaterial3D.new()
@@ -42,14 +43,15 @@ func _initialize() -> void:
 		scene.pack(node)
 		ResourceSaver.save(scene, "res://assets/models/terrain/" + id + ".tscn")
 		node.free()
-	print("SIX TERRAIN MODELS CREATED")
+	print("TERRAIN MODELS CREATED")
 	quit()
 
 func _material(id: String, kind: String) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.resource_name = id + "_" + kind
 	var extension := "png" if kind == "top" else "svg"
-	material.albedo_texture = load("res://assets/terrain/%s_%s.%s" % [id, kind, extension])
+	var texture_id := "sheet_riverbed" if id == "sheet_river_low" and kind == "side" else id
+	material.albedo_texture = load("res://assets/terrain/%s_%s.%s" % [texture_id, kind, extension])
 	var span := (252.0 if kind == "top" else 124.0) / 512.0
 	material.uv1_scale = Vector3(span, span, 1.0)
 	material.uv1_offset = Vector3(2.0 / 512.0, 2.0 / 512.0, 0.0)
@@ -59,6 +61,6 @@ func _material(id: String, kind: String) -> StandardMaterial3D:
 		material.detail_enabled = true
 		material.detail_uv_layer = BaseMaterial3D.DETAIL_UV_2
 		material.detail_albedo = load("res://assets/terrain/parcel_corner.svg")
-	material.roughness = 0.66 if id in ["sheet_river", "sheet_oasis"] and kind == "top" else 0.96
+	material.roughness = 0.66 if id in ["sheet_river", "sheet_river_low", "sheet_oasis"] and kind == "top" else 0.96
 	material.metallic_specular = 0.18
 	return material

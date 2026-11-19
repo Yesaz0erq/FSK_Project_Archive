@@ -123,6 +123,7 @@ func _ready() -> void:
 	# Reuse the isolated slot to exercise the normal version-one file loader.
 	var old: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
 	old.version = 1
+	old.erase("terrain_generator")
 	old.inventory = {"life": 7}
 	old.machines = [{"uid": 90, "type": "leafwing_turbine", "biome": BIOME, "cell": [2, 3]}]
 	old.terrain_overrides = terrain
@@ -139,6 +140,11 @@ func _ready() -> void:
 	file.store_string(JSON.stringify(old))
 	file.close()
 	assert(Sim.load_game(path))
+	assert(Land.generation_version == 1)
+	for b: String in Data.biome_order:
+		assert(Land.river_mouths[b][0].edge == 2 and Land.river_mouths[b][1].edge == 3)
+	assert(Sim.save_game(path))
+	assert(JSON.parse_string(FileAccess.get_file_as_string(path)).terrain_generator == 1)
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	assert(Sim.machines.size() == 1 and Sim.machine_at(BIOME, C).type == "propagator")
 	assert(Sim.growth_at(BIOME, A).stage == "phase1" and Sim.growth_at(BIOME, A).remaining == 3.0)

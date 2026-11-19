@@ -591,6 +591,9 @@ func _finish_tide_motion(cell: Vector2i) -> void:
 
 func _on_tide_tile(b: String, cell: Vector2i, old_id: String, next_id: String, edge: int) -> void:
 	if b != biome or showcase or not _tiles.has(cell): return
+	if old_id in ["sheet_river", "sheet_riverbed"] and next_id in ["sheet_river", "sheet_riverbed"]:
+		_on_tide_transform(b, cell, old_id, next_id, edge)
+		return
 	var tile: MeshInstance3D = _tiles[cell]
 	var tween := _begin_tide_motion(cell, next_id)
 	var start_y := tile.position.y
@@ -690,7 +693,11 @@ func _on_tide_transform(b: String, cell: Vector2i, old_id: String, new_id: Strin
 	crest.set_shader_parameter("direction", directions[edge])
 	crest.set_shader_parameter("crest_color", Color("a7f6fa").lerp(Data.palette(biome, "accent"), 0.42))
 	tile.material_overlay = crest
-	var sweep := func(progress: float) -> void: crest.set_shader_parameter("progress", progress)
+	var start_y: float = tile.position.y - float(_selection_lifts.get(cell, 0.0))
+	var end_y: float = float(_tile_heights[cell]) - 0.31
+	var sweep := func(progress: float) -> void:
+		crest.set_shader_parameter("progress", progress)
+		tile.position.y = lerpf(start_y, end_y, smoothstep(0.0, 1.0, progress)) + float(_selection_lifts.get(cell, 0.0))
 	tween.tween_method(sweep, 0.0, 0.5, 0.27)
 	tween.tween_callback(_set_tile_model.bind(tile, new_id, cell))
 	tween.tween_method(sweep, 0.5, 1.0, 0.27)

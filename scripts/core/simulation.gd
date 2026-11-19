@@ -486,7 +486,8 @@ func save_game(path: String = SAVE_PATH) -> bool:
 		ms.append({"uid": m.uid, "type": m.type, "biome": m.biome, "cell": [m.cell.x, m.cell.y], "recipe": m.recipe,
 			"progress": m.progress, "started": m.started, "wear": m.wear, "jammed": m.jammed, "enabled": m.enabled,
 			"carry": m.carry, "cycles": m.cycles, "last_output": m.get("last_output", {})})
-	var data: Dictionary = {"version": 2, "seed": seed_value, "time": game_time, "money": money, "reputation": reputation,
+	var data: Dictionary = {"version": 3, "seed": seed_value, "terrain_generator": Land.generation_version,
+		"time": game_time, "money": money, "reputation": reputation,
 		"life_growth": life_growth, "inventory": inventory, "energy": energy, "machines": ms, "next_uid": next_uid, "orders": orders,
 		"weather": weather, "weather_timer": weather_timer, "weather_bindings": Land.save_bindings(), "delivered": delivered,
 		"energy_offsets": Land.energy_offsets, "eternity_records": eternity_records,
@@ -509,7 +510,7 @@ func load_game(path: String = SAVE_PATH) -> bool:
 	if not parsed is Dictionary: return false
 	var d: Dictionary = parsed
 	seed_value = int(d.get("seed", 0))
-	Land.generate(seed_value)
+	Land.generate(seed_value, int(d.get("terrain_generator", 1)))
 	Land.energy_offsets = d.get("energy_offsets", {})
 	eternity_records = d.get("eternity_records", {})
 	for record: Dictionary in eternity_records.values():

@@ -6,13 +6,14 @@ var _surface := SurfaceTool.new()
 var _lamp_position := Vector3.ZERO
 
 func build(biome: String, land: Node3D) -> void:
-	const Z := -14.0
-	var banks: Vector2 = land.river_span_at(Z)
+	var z_center: float = land.crossing_z
+	rotation.y = land.rotation.y
+	var banks: Vector2 = land.river_span_at(z_center)
 	if banks.y <= banks.x: return
 	var left := banks.x - 0.80
 	var right := banks.y + 0.80
-	var foot_l: float = land.height_at(left, Z)
-	var foot_r: float = land.height_at(right, Z)
+	var foot_l: float = land.height_in_river_frame(left, z_center)
+	var foot_r: float = land.height_in_river_frame(right, z_center)
 	var rim := maxf(foot_l, foot_r) + 0.47
 	var colors: Array = {
 		"forest": ["805a44", "c09867", "456165", "8ab1a1"],
@@ -27,10 +28,10 @@ func build(biome: String, land: Node3D) -> void:
 	_surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var masonry := biome in ["desert", "volcano"]
 	for x: float in [left, right]:
-		var bottom: float = land.height_at(x, Z) - 0.52
-		_box(Vector3(x, (bottom + rim) * 0.5, Z), Vector3(0.72, rim - bottom, 1.42), stone)
-		_box(Vector3(x, rim, Z), Vector3(0.86, 0.16, 1.53), cap)
-	for z: float in [Z-0.46, Z+0.46]:
+		var bottom: float = land.height_in_river_frame(x, z_center) - 0.52
+		_box(Vector3(x, (bottom + rim) * 0.5, z_center), Vector3(0.72, rim - bottom, 1.42), stone)
+		_box(Vector3(x, rim, z_center), Vector3(0.86, 0.16, 1.53), cap)
+	for z: float in [z_center-0.46, z_center+0.46]:
 		if masonry:
 			# Voussoirs describe an open arch above the channel.
 			for i in 12:
@@ -50,8 +51,8 @@ func build(biome: String, land: Node3D) -> void:
 		var t := (i+0.5)/count
 		var y := rim + 0.13 + (0.12 if masonry else 0.035)*sin(t*PI)
 		var col := wood.lerp(sun_face, [0.22, 0.64, 0.34, 0.46, 0.58][i%5])
-		_box(Vector3(left + t*(right-left), y, Z), Vector3(width-0.012, 0.13, 1.20), col)
-	var rail_z := Z-0.54
+		_box(Vector3(left + t*(right-left), y, z_center), Vector3(width-0.012, 0.13, 1.20), col)
+	var rail_z := z_center-0.54
 	for i in 4:
 		var t := i / 3.0
 		var x := lerpf(left,right,t)
@@ -62,7 +63,7 @@ func build(biome: String, land: Node3D) -> void:
 			var mid := Vector3((x+next_x)*0.5, rim+0.68, rail_z)
 			_rail(Vector3(x,rim+0.82,rail_z),mid,0.05,0.06, sun_face)
 			_rail(mid,Vector3(next_x,rim+0.82,rail_z),0.05,0.06,sun_face)
-	_lamp_position = Vector3(right, rim+1.23, Z+0.49)
+	_lamp_position = Vector3(right, rim+1.23, z_center+0.49)
 	_box(_lamp_position - Vector3.UP*0.57, Vector3(0.14,1.16,0.14), stone)
 	_box(_lamp_position - Vector3.UP*0.02, Vector3(0.33,0.10,0.33), cap)
 	_box(_lamp_position + Vector3.UP*0.36, Vector3(0.40,0.10,0.40), stone)

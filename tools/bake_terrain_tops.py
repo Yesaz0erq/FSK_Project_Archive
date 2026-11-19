@@ -117,7 +117,7 @@ def forest_litter(soil, grass, sand):
 
 
 def padded(tile):
-    output = Image.new("RGB", (SLOT, SLOT))
+    output = Image.new(tile.mode, (SLOT, SLOT))
     end = SLOT - GUTTER
     output.paste(tile, (GUTTER, GUTTER))
     output.paste(tile.crop((0, 0, 1, SAMPLE)).resize((GUTTER, SAMPLE)), (0, GUTTER))
@@ -138,6 +138,37 @@ def source_tile(sheet, index):
     return face.resize((SAMPLE, SAMPLE), Image.Resampling.LANCZOS)
 
 
+def bake_low_river():
+    """Paint submerged gravel and wet gravel bars; alpha stores depth for the moving light."""
+    with Image.open(OUTPUT / "sheet_river_top.png") as water, Image.open(OUTPUT / "sheet_riverbed_top.png") as bed:
+        atlas = Image.new("RGBA", water.size)
+        for region in range(4):
+            left, top = (region % 2) * SLOT, (region // 2) * SLOT
+            box = (left + GUTTER, top + GUTTER, left + SLOT - GUTTER, top + SLOT - GUTTER)
+            river = water.crop(box).convert("RGB").load()
+            gravel = bed.crop(box).convert("RGB").load()
+            shoal = Image.new("RGBA", (SAMPLE, SAMPLE))
+            pixels = shoal.load()
+            for y in range(SAMPLE):
+                v = y / SAMPLE
+                for x in range(SAMPLE):
+                    u = x / SAMPLE
+                    stone = gravel[x, y]
+                    ripple = river[x, y]
+                    # Broad braided pools have a broken, pixel-stepped shoreline.
+                    depth = (.47 * sin(19 * u + 8 * v + 2.6 * sin(9 * v))
+                             + .33 * cos(14 * v - 11 * u) + .17 * sin(28 * v + 18 * u)
+                             + .11 * sin(61 * u - 33 * v) - (sum(stone) / 3 - 100) / 245 + .19)
+                    wet = min(1, max(0, (depth + .08) * 2.7))
+                    mix = .12 + .60 * wet
+                    rim = 8 if -.09 < depth < -.04 else 0
+                    color = tuple(min(255, round(s * (.82 - .16 * wet) * (1 - mix) + r * mix + rim))
+                                  for s, r in zip(stone, ripple))
+                    pixels[x, y] = (*color, 32 + round(wet * 223))
+            atlas.paste(padded(shoal), (left, top))
+        atlas.save(OUTPUT / "sheet_river_low_top.png", optimize=True)
+
+
 def main():
     with Image.open(SOURCE) as image:
         sheet = image.convert("RGB")
@@ -153,6 +184,7 @@ def main():
                                       dither=Image.Dither.NONE).convert("RGB")
             atlas.paste(padded(colored), (district % 2 * SLOT, district // 2 * SLOT))
         atlas.save(OUTPUT / f"sheet_{kind}_top.png", optimize=True)
+    bake_low_river()
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ const TOP_SPAN := 252.0 / 512.0
 const SIDE_SLOT := 128.0 / 512.0
 const SURFACE_FX := preload("res://assets/shaders/parcel_light.gdshader")
 const SKY_REFLECTIONS := [Color("96e2d4"), Color("ffd8ad"), Color("ec9ca3"), Color("daefff")]
-const EFFECTS := {"sheet_river": 0, "sheet_oasis": 1, "sheet_burnt": 2, "sheet_grass": 3}
+const EFFECTS := {"sheet_river": 0, "sheet_oasis": 1, "sheet_burnt": 2, "sheet_grass": 3, "sheet_river_low": 4}
 
 # Adjacent cells share the same UV endpoint. The unequal intervals and mirror at
 # each end carry sand ridges, moss banks and reflections across tile boundaries.
@@ -58,9 +58,8 @@ static func apply(tile: MeshInstance3D, id: String, biome: String, cell: Vector2
 		if _glint_seed != Land.world_seed:
 			_glints.clear()
 			_glint_seed = Land.world_seed
-		# Only foliage and embers sample the painting to mask their highlights.
 		var key := "%s/%d" % [id, district]
-		if id in ["sheet_grass", "sheet_burnt"]:
+		if id in ["sheet_grass", "sheet_burnt", "sheet_river_low"]:
 			key += "/%s/%s" % [offset, span]
 		if not _glints.has(key):
 			var glint := ShaderMaterial.new()

@@ -19,8 +19,10 @@ signal binding_expired(binding: Dictionary)
 
 const GRID: int = 11
 const JITTER: int = 7
+const GENERATOR_VERSION := 2
 
 var world_seed: int = 0
+var generation_version: int = GENERATOR_VERSION
 var cleared: Dictionary = {}
 var terrain_overrides: Dictionary = {}
 var energy_offsets: Dictionary = {}
@@ -32,10 +34,14 @@ var _base: Dictionary = {}       # biome -> Array[Dictionary] (index = y * GRID 
 var bindings: Array = []         # Array[Dictionary]
 var _next_binding: int = 1
 var _cache: Dictionary = {}      # biome -> Array (computed parcels) ; missing = dirty
-var river_mouth_columns: Dictionary = {}  # Seed-generated north and south banks, before tides or cultivation.
+var river_mouths: Dictionary = {}  # Original bank intervals by biome, inclusive along each edge.
+var _deep_channels: Dictionary = {}  # River cells that retain water at ebb.
 
-func generate(seed_value: int) -> void:
+func generate(seed_value: int, version: int = GENERATOR_VERSION) -> void:
 	world_seed = seed_value
+	generation_version = version
+	river_mouths.clear()
+	_deep_channels.clear()
 	cleared.clear()
 	terrain_overrides.clear()
 	energy_offsets.clear()
@@ -78,6 +84,53 @@ func _weighted(rng: RandomNumberGenerator, weights: Dictionary) -> String:
 		if roll <= 0.0: return k
 	return str(weights.keys()[0])
 
+func _carve_river(biome: String, terrain_rng: RandomNumberGenerator) -> Dictionary:
+	var water := {}
+	var deep := {}
+	var mouths: Array[Dictionary] = []
+	var legacy := generation_version == 1
+	var route := _rng_for(biome, "river-course")
+	var across := not legacy and route.randi_range(0, 1) == 1
+	var center := 5 if legacy else route.randi_range(2, GRID - 3)
+	var target := center
+	var shelf_side := -1 if route.randi_range(0, 1) == 0 else 1
+	for row in GRID:
+		var previous := center
+		if legacy:
+			# Old saves rebuild deposits and effects from the same RNG after this walk.
+			center = clampi(previous + terrain_rng.randi_range(-1, 1), 4, 6)
+		else:
+			if row % 4 == 0:
+				target = route.randi_range(2, GRID - 3)
+				if target != previous: shelf_side = signi(target - previous)
+			center += signi(target - center)
+		var first := mini(previous, center)
+		var last := maxi(previous, center)
+		for column in range(first, last + 1):
+			var cell := Vector2i(row, column) if across else Vector2i(column, row)
+			water[cell] = true
+			if not legacy: deep[cell] = true
+		if not legacy and (row == 0 or row == GRID - 1 or route.randf() < 0.70):
+			var shelf := first - 1 if shelf_side < 0 else last + 1
+			var cell := Vector2i(row, shelf) if across else Vector2i(shelf, row)
+			water[cell] = true
+			first = mini(first, shelf)
+			last = maxi(last, shelf)
+		if row == 0 or row == GRID - 1:
+			var edge := (0 if across else 2) + (1 if row == GRID - 1 else 0)
+			mouths.append({"edge": edge, "first": first, "last": last})
+	if legacy:
+		# Trace a four-connected channel inside the exact one- or two-cell-wide old course.
+		var column := int(mouths[0].first)
+		for row in GRID:
+			deep[Vector2i(column, row)] = true
+			if row < GRID - 1 and not water.has(Vector2i(column, row + 1)):
+				column += 1 if water.has(Vector2i(column + 1, row)) else -1
+				deep[Vector2i(column, row)] = true
+	river_mouths[biome] = mouths
+	_deep_channels[biome] = deep
+	return water
+
 func _generate_biome(biome: String) -> void:
 	var def: Dictionary = Data.biomes[biome]
 	var rng := _rng_for(biome)
@@ -111,15 +164,7 @@ func _generate_biome(biome: String) -> void:
 				"deposit": "", "variant": rng.randi_range(0, 999)
 			}
 	# Spreadsheet terrain: connected river, adjoining grass, dry land beyond.
-	var river_cells: Dictionary = {}
-	var outlets: Array[Vector2i] = []
-	var rx: int = 5
-	for y in range(GRID):
-		var next_x: int = clampi(rx + rng.randi_range(-1, 1), 4, 6)
-		if y == 0 or y == GRID - 1: outlets.append(Vector2i(mini(rx, next_x), maxi(rx, next_x)))
-		for x in range(mini(rx, next_x), maxi(rx, next_x) + 1): river_cells[Vector2i(x, y)] = true
-		rx = next_x
-	river_mouth_columns[biome] = outlets
+	var river_cells := _carve_river(biome, rng)
 	for y in range(GRID):
 		for x in range(GRID):
 			var cell := Vector2i(x, y)
@@ -130,6 +175,11 @@ func _generate_biome(biome: String) -> void:
 			cells[y * GRID + x].land = "sheet_river" if river_cells.has(cell) else ("sheet_grass" if near_water else "sheet_sand")
 	# Isolated oasis is water: convert its neighbours to grass as well.
 	var oasis := Vector2i(rng.randi_range(0, 1), rng.randi_range(1, GRID - 2))
+	if generation_version != 1 and cells[oasis.y * GRID + oasis.x].land != "sheet_sand":
+		var dry: Array[Vector2i] = []
+		for parcel: Dictionary in cells:
+			if parcel.land == "sheet_sand": dry.append(parcel.cell)
+		oasis = dry[rng.randi_range(0, dry.size() - 1)]
 	cells[oasis.y * GRID + oasis.x].land = "sheet_oasis"
 	for yy in range(maxi(0, oasis.y - 1), mini(GRID, oasis.y + 2)):
 		for xx in range(maxi(0, oasis.x - 1), mini(GRID, oasis.x + 2)):
@@ -366,10 +416,15 @@ func _tide_replace(biome: String, cell: Vector2i, edge: int) -> void:
 	offsets["concentration"] = int(offsets.get("concentration", 0)) + 1
 	energy_offsets[key] = offsets
 	_invalidate(biome)
-	if old_id == "sheet_riverbed":
-		clear_attachment(biome, cell)
-		riverbed_flooded.emit(biome, cell)
 	if bool(offsets.get("stabilized", false)): return
+	if old_id == "sheet_river_low":
+		_replace_land(biome, cell, "sheet_river", false, edge)
+		return
+	if old_id == "sheet_river" and _deep_channels[biome].has(cell):
+		_replace_land(biome, cell, "sheet_river_low", false, edge)
+		return
+	if old_id == "sheet_riverbed":
+		riverbed_flooded.emit(biome, cell)
 	var mode: String = str(rule.get("tide", "/"))
 	var next_id: String = ""
 	if mode == "翻转":
