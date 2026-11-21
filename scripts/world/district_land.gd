@@ -112,8 +112,7 @@ func build(biome_id: String, seed_value: int) -> void:
 func _read_border(cell: Vector2i) -> void:
 	var p := Land.get_parcel(biome, cell)
 	var id: String = p.land
-	_borders[cell] = {"height": float(p.height), "kind": IDS.find(id),
-		"uv": Surface.atlas_rect(id, _district, cell, _seed)}
+	_borders[cell] = {"height": float(p.height), "kind": IDS.find(id)}
 
 func river_span_at(z: float) -> Vector2:
 	var mouth := _mouths[0 if z < 0.0 else 1]
@@ -315,6 +314,13 @@ func _build_surface(margin: bool) -> ArrayMesh:
 			var site := _owner(mid.x,mid.y)
 			var info: Dictionary = _borders[site] if margin else {}
 			var kind := int(info.kind) if margin else -1
+			var paint_cell := site
+			var uv_rect := Rect2()
+			if margin:
+				if kind != 5:
+					# Continue the print onto virtual cells outside the fence.
+					paint_cell = Vector2i((_world_point(mid.x,mid.y) / TILE + Vector2(5.5,5.5)).floor())
+				uv_rect = Surface.atlas_rect(IDS[kind], _district, paint_cell, _seed)
 			var vertices := PackedVector3Array()
 			var uvs := PackedVector2Array()
 			var attrs := PackedVector2Array()
@@ -331,10 +337,8 @@ func _build_surface(margin: bool) -> ArrayMesh:
 						if absf(ox) > EDGE - 0.001: point.x -= signf(ox) * 0.0051
 						if absf(z) > EDGE - 0.001: point.z -= signf(z) * 0.0051
 					vertices.append(point)
-					var uv_rect: Rect2 = info.uv
-					var local := _world_point(ox,z) / TILE + Vector2(5.5,5.5) - Vector2(site)
-					local = Vector2(pingpong(local.x,1.0),pingpong(local.y,1.0))
-					uvs.append(uv_rect.position + uv_rect.size * local)
+					var local := _world_point(ox,z) / TILE + Vector2(5.5,5.5) - Vector2(paint_cell)
+					uvs.append(uv_rect.position + uv_rect.size * local.clamp(Vector2.ZERO,Vector2.ONE))
 				else:
 					if not points.has(key):
 						var x := _source_x(ox,z,false)

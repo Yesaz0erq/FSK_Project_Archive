@@ -25,7 +25,11 @@ void fragment() {
 	vec3 mid = local_position + ray * length_inside * 0.5;
 	float core = max(0.0, 1.0 - dot(mid.xz, mid.xz));
 	float vertical = max(0.0, 1.0 - mid.y*mid.y);
-	float drift = 0.82 + 0.18 * sin(mid.z*9.0 + mid.x*8.0 + seed + TIME*0.3);
+	// Gaps between leaves divide the shaft into a broad streak and fine slits.
+	// Their positions are fixed in the volume as the camera travels.
+	float opening = mid.z*.66 + mid.x*.74;
+	float slit = sin(opening*14.0 + seed) + .38*sin(opening*27.0 - seed);
+	float drift = (.46 + .54*smoothstep(-.31,.18,slit)) * (.94 + .06*sin(seed+TIME*.48));
 	ALBEDO = radiance.rgb;
 	ALPHA = radiance.a * core*core * vertical * length_inside * drift;
 }

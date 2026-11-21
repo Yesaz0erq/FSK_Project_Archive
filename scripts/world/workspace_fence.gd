@@ -34,16 +34,14 @@ func build(biome: String, terrain: Node3D) -> void:
 	_rail = Color(colors[1])
 	_band = Color(colors[2])
 	_cap = Color(colors[3])
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.roughness = 0.9
-	material_override = mat
+	material_override = preload("res://assets/shaders/district_specimen.tres")
 	_remesh()
 	_land.margin_rebuilt.connect(_remesh)
 
 func _remesh() -> void:
 	_surface = SurfaceTool.new()
 	_surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	_surface.set_uv(Vector2.ZERO)
 	_posts.clear()
 	for edge in 4:
 		var first := 0
@@ -82,19 +80,23 @@ func _run(edge: int, first: int, limit: int) -> void:
 func _post(p: Vector3, end: bool) -> void:
 	var radius := 0.145 if end else 0.105
 	var h := 0.71 if end else 0.61
+	_surface.set_uv2(Vector2(4 if _biome == "desert" else (0 if _biome == "volcano" else 3), 0))
 	match _biome:
 		"desert", "volcano":
 			_prism(p, -0.19, 0.14, radius*1.34, radius*1.17, _wood.darkened(0.15))
 			_prism(p, 0.14, h-0.11, radius*1.13, radius*0.85, _wood)
 		_:
 			_prism(p, -0.17, h-0.11, radius*1.06, radius*0.90, _wood)
+	_surface.set_uv2(Vector2(12, 0)) # Cast bronze collar.
 	_prism(p, h-0.11, h-0.047, radius*1.03, radius*1.03, _band)
+	_surface.set_uv2(Vector2(6 if _biome == "snow" else 12, 0))
 	_prism(p, h-0.047, h, radius*1.15, radius*0.88, _cap)
 	if end:
 		_prism(p, h, h+0.077, radius*0.80, radius*0.48, _cap.lightened(0.06))
 
 func _span(a: Vector3, b: Vector3, variant: int) -> void:
 	var pigment := _rail.darkened(variant*0.036)
+	_surface.set_uv2(Vector2(0 if _biome == "volcano" else (14 if _biome == "desert" else 7), 0))
 	if _biome == "desert":
 		# Stiff woven straps hang between the cut-stone stanchions.
 		for height: float in [0.27, 0.49]:
@@ -105,8 +107,10 @@ func _span(a: Vector3, b: Vector3, variant: int) -> void:
 	_beam(a+Vector3.UP*0.24,b+Vector3.UP*0.24,0.085,0.088,pigment.darkened(0.15))
 	_beam(a+Vector3.UP*0.49,b+Vector3.UP*0.49,0.105,0.115,pigment)
 	if _biome == "snow":
+		_surface.set_uv2(Vector2(6, 0))
 		_beam(a+Vector3.UP*0.555,b+Vector3.UP*0.555,0.112,0.025,_cap)
 	elif _biome == "volcano" and variant == 0:
+		_surface.set_uv2(Vector2(12, 0))
 		_beam(a+Vector3.UP*0.265,a.lerp(b,0.38)+Vector3.UP*0.47,0.065,0.068,_band)
 
 func _prism(p: Vector3, bottom: float, top: float, r0: float, r1: float, color: Color) -> void:
@@ -121,6 +125,7 @@ func _prism(p: Vector3, bottom: float, top: float, r0: float, r1: float, color: 
 
 func _beam(a: Vector3, b: Vector3, width: float, height: float, color: Color) -> void:
 	var along := (b-a).normalized()
+	_surface.set_uv(Vector2(1. if absf(along.z) > absf(along.x) else 0., 0.))
 	var side := along.cross(Vector3.UP).normalized()
 	var top := side.cross(along)*height*0.5
 	side *= width*0.5

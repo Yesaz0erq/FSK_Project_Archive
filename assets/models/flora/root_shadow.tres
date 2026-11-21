@@ -1,0 +1,25 @@
+[gd_resource type="PlaneMesh" format=3]
+
+[sub_resource type="Gradient" id="Gradient_shadow"]
+offsets = PackedFloat32Array(0, 0.22, 0.40, 0.61, 0.82, 1)
+colors = PackedColorArray(0.045, 0.049, 0.086, 0.52, 0.054, 0.052, 0.094, 0.45, 0.066, 0.061, 0.104, 0.31, 0.069, 0.065, 0.113, 0.17, 0.073, 0.069, 0.122, 0.06, 0.073, 0.069, 0.122, 0)
+
+[sub_resource type="GradientTexture2D" id="Texture_shadow"]
+gradient = SubResource("Gradient_shadow")
+width = 32
+height = 32
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(0.98, 0.5)
+use_hdr = false
+
+[sub_resource type="StandardMaterial3D" id="Material_shadow"]
+transparency = 1
+shading_mode = 0
+albedo_texture = SubResource("Texture_shadow")
+texture_filter = 0
+render_priority = 1
+
+[resource]
+material = SubResource("Material_shadow")
+size = Vector2(1.42, 1.24)

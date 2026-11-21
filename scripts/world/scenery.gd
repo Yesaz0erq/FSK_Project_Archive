@@ -6,14 +6,16 @@ const DistrictProps := preload("res://scripts/world/district_props.gd")
 const Crossing := preload("res://scripts/world/river_crossing.gd")
 const Fence := preload("res://scripts/world/workspace_fence.gd")
 const Grade := preload("res://assets/shaders/environment_grade.gdshader")
+const Contour := preload("res://assets/shaders/relief_contour.gdshader")
 const Column := preload("res://assets/shaders/sun_column.gdshader")
 
 const LIGHT := {
-	"forest": [Color("d3c3e4"), Color("788fae"), Color("777291"), Color("ec9bb8")],
-	"desert": [Color("f7c3a3"), Color("a79aac"), Color("ae94ae"), Color("efb7a8")],
-	"volcano": [Color("dc9c9e"), Color("9688b1"), Color("8c6787"), Color("ed9c94")],
-	"snow": [Color("fed6df"), Color("a1b8df"), Color("9ba9cd"), Color("eac4e1")]
+	"forest": [Color("ffe1b4"), Color("889ec2"), Color("726a91"), Color("f5a6bd")],
+	"desert": [Color("ffd4a2"), Color("af9bc8"), Color("b28eac"), Color("ffb1a1")],
+	"volcano": [Color("ffab86"), Color("9696c4"), Color("875676"), Color("fd997e")],
+	"snow": [Color("ffdfd5"), Color("93b7dc"), Color("a2a8d2"), Color("f4bed9")]
 }
+const CLEAR_SUN := 0.96
 var biome := "forest"
 var land := DistrictLand.new()
 var env := Environment.new()
@@ -47,7 +49,7 @@ func build(biome_id: String, seed_value: int) -> void:
 
 func _build_lights() -> void:
 	var palette: Array = LIGHT[biome]
-	_sun_target = 0.78
+	_sun_target = CLEAR_SUN
 	var world := WorldEnvironment.new()
 	var atmosphere := ProceduralSkyMaterial.new()
 	atmosphere.sky_top_color = Data.palette(biome, "sky_top")
@@ -62,7 +64,7 @@ func _build_lights() -> void:
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = palette[1]
-	env.ambient_light_energy = 0.57
+	env.ambient_light_energy = 0.49
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	env.fog_enabled = true
@@ -83,7 +85,7 @@ func _build_lights() -> void:
 	sun.light_energy = _sun_target
 	sun.rotation_degrees = Vector3(-41, -43, 0)
 	sun.shadow_enabled = true
-	sun.shadow_opacity = 0.78
+	sun.shadow_opacity = 0.85
 	sun.shadow_bias = 0.035
 	sun.shadow_normal_bias = 0.65
 	sun.directional_shadow_max_distance = 104.0
@@ -92,7 +94,7 @@ func _build_lights() -> void:
 	var fill := DirectionalLight3D.new()
 	fill.name = "SkyBounce"
 	fill.light_color = Data.palette(biome, "ambient")
-	fill.light_energy = 0.22
+	fill.light_energy = 0.19
 	fill.rotation_degrees = Vector3(-28, 139, 0)
 	fill.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY
 	add_child(fill)
@@ -106,11 +108,17 @@ func _grazing_light() -> void:
 		"volcano": [Color("acafe3"),Color("ff8055")],
 		"snow": [Color("a4edff"),Color("ffd1d9")]
 	}
+	# Anchor the cold reflection and the amber clearing to the actual mouths.
+	var mouth_focus: Array[Vector3] = []
+	for sign_z: float in [-1., 1.]:
+		var z := sign_z * (land.EDGE + 1.3)
+		var banks := land.river_span_at(z)
+		mouth_focus.append(land.to_global(Vector3((banks.x + banks.y) * .5, 0, z)))
 	for i in 2:
 		var pool := SpotLight3D.new()
 		pool.name = "RiverLight" if i == 0 else "BankLight"
-		pool.position = Vector3(2.2,8.0,0.8) if i == 0 else Vector3(-10.0,6.1,-12.0)
-		var focus := Vector3(0,-0.2,1.4) if i == 0 else Vector3(-6.0,0,-8.0)
+		var focus: Vector3 = mouth_focus[i] * (0.76 if i == 0 else 0.88)
+		pool.position = focus + (Vector3(1.5,6.7,0.8) if i == 0 else Vector3(-3.3,8.2,-3.5))
 		add_child(pool)
 		pool.look_at(focus,Vector3.UP)
 		pool.spot_range = 18.0
@@ -118,7 +126,7 @@ func _grazing_light() -> void:
 		pool.spot_attenuation = 0.8
 		pool.spot_angle_attenuation = 1.5
 		pool.light_color = colors[biome][i]
-		pool.light_energy = 1.25 if i == 0 else 1.70
+		pool.light_energy = 1.65 if i == 0 else 2.08
 
 func _atmosphere() -> void:
 	# Finite shafts are world volumes; both ends remain fixed as the camera turns.
@@ -130,11 +138,14 @@ func _atmosphere() -> void:
 		ray.bottom_radius = 1.0
 		ray.radial_segments = 16
 		ray.rings = 0
-		for position_xz: Vector2 in [Vector2(-14,-12), Vector2(-16,-10), Vector2(14,15)]:
+		var banks := land.river_span_at(land.crossing_z)
+		var bridge := land.to_global(Vector3(banks.x,0,land.crossing_z))
+		var clearing := Vector2(bridge.x,bridge.z)
+		for position_xz: Vector2 in [clearing, clearing + Vector2(1.9,0.6), -clearing * .83]:
 			var shaft := MeshInstance3D.new()
 			var ink := ShaderMaterial.new()
 			ink.shader = Column
-			ink.set_shader_parameter("radiance", Color(1.0, 0.88, 0.65, 0.070) if biome == "forest" else Color(0.82,0.91,1.0,0.061))
+			ink.set_shader_parameter("radiance", Color(1.0, 0.82, 0.54, 0.119) if biome == "forest" else Color(0.80,0.92,1.0,0.093))
 			ink.set_shader_parameter("seed", position_xz.x)
 			shaft.mesh = ray
 			shaft.material_override = ink
@@ -150,6 +161,22 @@ func _atmosphere() -> void:
 		"snow": MeshKit.particles(self, Vector3(0, 5, 0), Color("e4f7ff"), 95, Vector3(14, 1, 14), Vector3(0.22, -0.78, 0.17), 0.10, 8.5)
 
 func _pixel_pass() -> void:
+	var quad := QuadMesh.new()
+	quad.size = Vector2(2,2)
+	var outline := MeshInstance3D.new()
+	outline.name = "ReliefContours"
+	outline.mesh = quad
+	outline.custom_aabb = AABB(Vector3(-140,-60,-140),Vector3(280,180,280))
+	outline.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var contour := ShaderMaterial.new()
+	contour.shader = Contour
+	contour.render_priority = -120
+	var weather_seed := hash([Land.world_seed, biome, "cloud cover"])
+	contour.set_shader_parameter("cloud_phase", Vector2(weather_seed & 255, (weather_seed >> 8) & 255) * .13)
+	contour.set_shader_parameter("shade_tint", LIGHT[biome][1].darkened(.76))
+	contour.set_shader_parameter("cloud_opacity", .25 if biome in ["forest", "volcano"] else .18)
+	outline.material_override = contour
+	add_child(outline)
 	var layer := CanvasLayer.new()
 	layer.name = "WorldPixelGrade"
 	layer.layer = 1
@@ -167,7 +194,7 @@ func _pixel_pass() -> void:
 func set_weather(effect_id: String) -> void:
 	for key: String in _weather_nodes: _weather_nodes[key].emitting = false
 	_target_tint = Color.WHITE
-	_sun_target = 0.78
+	_sun_target = CLEAR_SUN
 	match effect_id:
 		"rain":
 			_target_tint = Color("c0cce0")

@@ -1,5 +1,6 @@
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, shadows_disabled, fog_disabled;
+#include "res://assets/shaders/water_reflection.gdshaderinc"
 
 uniform int family = 0;
 uniform vec4 reflected_sky : source_color = vec4(0.64, 0.88, 0.87, 1.0);
@@ -18,18 +19,16 @@ void fragment() {
 	float strength;
 	vec3 pigment = reflected_sky.rgb;
 	if (family < 2 || family == 4) {
-		float wave = sin(p.y * 13.6 - TIME * 1.54 + sin(p.x * 3.8 + TIME * 0.41));
-		float window = sin(p.x * 3.2 + sin(p.y * 2.7 + TIME * .26)) * .5 + .5;
-		float streak = smoothstep(.78, .99, wave) * smoothstep(.35, .94, window);
+		float streak = water_glint(ground, TIME);
 		float wide = .5 + .5 * sin(p.x * 1.12 + p.y * .5 + TIME * .21);
-		strength = streak * (.12 + .30 * wide);
+		strength = streak * (.09 + .18 * wide);
 		if (family == 4) {
 			float depth = texture(paint, atlas_corner + UV * atlas_span).a;
 			strength *= .52 * smoothstep(.24, .85, depth);
 		}
 		if (family == 1) {
-			float pool = length((UV - vec2(.5)) / vec2(.410, .347));
-			strength *= 1.0 - smoothstep(.75, .87, pool);
+			float wet = texture(paint, atlas_corner + UV * atlas_span).a;
+			strength *= smoothstep(.24,.85,wet);
 		}
 	} else if (family == 2) {
 		vec3 rock = texture(paint, atlas_corner + UV * atlas_span).rgb;

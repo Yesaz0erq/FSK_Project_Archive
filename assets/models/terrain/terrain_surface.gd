@@ -10,11 +10,10 @@ const SURFACE_FX := preload("res://assets/shaders/parcel_light.gdshader")
 const SKY_REFLECTIONS := [Color("96e2d4"), Color("ffd8ad"), Color("ec9ca3"), Color("daefff")]
 const EFFECTS := {"sheet_river": 0, "sheet_oasis": 1, "sheet_burnt": 2, "sheet_grass": 3, "sheet_river_low": 4}
 
-# Adjacent cells share the same UV endpoint. The unequal intervals and mirror at
-# each end carry sand ridges, moss banks and reflections across tile boundaries.
-# Tide flips, selection lifts and the black undersides still move independently.
-const PAINT_EDGES := [0.0, 0.18, 0.43, 0.63, 0.83, 1.0, 0.75, 0.45, 0.21,
-	0.0, 0.26, 0.51, 0.79, 1.0, 0.72, 0.50, 0.25]
+# Each zero starts another print of the seamless painting. Vary the number
+# of cells in a print so a distinctive stone seldom repeats in the next row.
+const PAINT_EDGES := [0.0, 0.23, 0.47, 0.74, 0.0, 0.18, 0.38, 0.59, 0.81,
+	0.0, 0.27, 0.51, 0.73]
 
 static var _sides: Dictionary = {}
 static var _glints: Dictionary = {}
@@ -29,6 +28,8 @@ static func atlas_rect(id: String, district: int, cell: Vector2i, seed_value: in
 	var y := cell.y + posmod(hash(seed_value), PAINT_EDGES.size())
 	var first := Vector2(_edge(x), _edge(y))
 	var last := Vector2(_edge(x + 1), _edge(y + 1))
+	if last.x == 0.0: last.x = 1.0
+	if last.y == 0.0: last.y = 1.0
 	if id == "sheet_oasis":
 		var column := posmod(hash(Vector3i(cell.x, cell.y, seed_value)), 4)
 		first = Vector2(column % 2, floori(column / 2.0))
@@ -50,6 +51,8 @@ static func apply(tile: MeshInstance3D, id: String, biome: String, cell: Vector2
 	var offset := rect.position
 	var span := rect.size
 	var top: StandardMaterial3D = tile.mesh.surface_get_material(0).duplicate()
+	if id in ["sheet_river", "sheet_river_low"]:
+		top.detail_enabled = false
 	top.uv1_offset = Vector3(offset.x, offset.y, 0)
 	top.uv1_scale = Vector3(span.x, span.y, 1)
 	if EFFECTS.has(id):
@@ -59,7 +62,7 @@ static func apply(tile: MeshInstance3D, id: String, biome: String, cell: Vector2
 			_glints.clear()
 			_glint_seed = Land.world_seed
 		var key := "%s/%d" % [id, district]
-		if id in ["sheet_grass", "sheet_burnt", "sheet_river_low"]:
+		if id in ["sheet_grass", "sheet_burnt", "sheet_river_low", "sheet_oasis"]:
 			key += "/%s/%s" % [offset, span]
 		if not _glints.has(key):
 			var glint := ShaderMaterial.new()

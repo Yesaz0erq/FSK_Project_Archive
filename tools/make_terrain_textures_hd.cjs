@@ -1,4 +1,4 @@
-// Rebuild the six stratified side atlases consumed by the six terrain meshes.
+// Rebuild the side atlases (low water shares the exposed riverbed cut).
 // Rows: forest, desert, volcano, snow. Columns: four stable parcel variations.
 // 124x124 painted pixels per sample, enlarged 2x; extruded gutters protect mip levels.
 const fs = require('node:fs');
@@ -13,16 +13,16 @@ const types = ['sand', 'grass', 'burnt', 'river', 'riverbed', 'oasis'];
 // Shadow, middle and light pigments for each material, in district order.
 const pigments = {
   sand: [
-    '785c62 a4856e c3aa83 e1ca98',
-    '995e63 c58b73 e5b787 f4d59e',
-    '544557 81615e a27b69 c19a80',
-    '8596b8 afc7d6 cadfe3 e8f1ed',
+    '4e4547 695948 806c52 ceb184',
+    '63414c 885653 a87159 e7b778',
+    '493547 64484f 805954 c79a74',
+    '516580 687d94 8193a3 c6d3ce',
   ],
   grass: [
-    '284f53 487b68 789b70 a2b87e',
-    '42635c 638866 899e70 b6b977',
-    '424d52 617765 87936d b29c76',
-    '526e85 72979d 94b8ac c4d7bb',
+    '193d46 225553 30695b 85ac69',
+    '364643 495947 606e48 a3a65a',
+    '353d42 49544d 5a6351 99a063',
+    '394e65 4c6975 628683 abc5b4',
   ],
   burnt: [
     '343348 514758 73616a ab8178',
@@ -41,12 +41,6 @@ const pigments = {
     '795f65 aa8576 c3a28a e0c6a5',
     '453d50 6e606a 908280 b4a499',
     '64758c 879ba9 abb9bf d2d8d4',
-  ],
-  earth: [
-    '342f43 554751 806855 a68c69',
-    '4a354e 78525c ab7768 d5a383',
-    '2d293d 493b50 6a515e 986d64',
-    '394660 586982 8395aa b3c6d2',
   ],
 };
 
@@ -136,67 +130,93 @@ class Tile {
   }
 }
 
-const sin = Math.sin;
-const cos = Math.cos;
-const between = (rng, low, high) => low + Math.floor(rng() * (high - low + 1));
-
-function contours(x, y, phase) {
-  return sin(x * .055 + sin(y * .075 + phase)) * .52 +
-    cos(y * .095 + x * .033 - phase) * .26 + sin(x * .14 - y * .1 - phase) * .13;
-}
-
-function stone(tile, x, y, radius, pal) {
-  const h = Math.max(2, Math.round(radius * .62));
-  for (let dy = -h; dy <= h; dy++) {
-    const span = Math.round(radius * Math.sqrt(1 - (dy / (h + .5)) ** 2));
-    const left = x - span + (dy > 1 ? 1 : 0);
-    tile.rect(left + 1, y + dy + 2, span * 2, 1, pal[1]);
-    tile.rect(left, y + dy, span * 2, 1, dy >= 1 ? pal[2] : pal[5]);
-    if (dy < 0) tile.rect(left, y + dy, Math.max(2, span - 1), 1, pal[6]);
+// Rasterize the drawn facets on the same grid as the exposed face, before
+// the UV gutters are extruded. All palette indices below address solid inks.
+function polygon(tile, points, color) {
+  const y0 = Math.max(0, Math.min(...points.map(p => p[1])));
+  const y1 = Math.min(SIZE, Math.max(...points.map(p => p[1])));
+  for (let y = Math.floor(y0); y < y1; y++) {
+    const cuts = [];
+    for (let i = 0; i < points.length; i++) {
+      const [a, b] = [points[i], points[(i + 1) % points.length]];
+      if ((a[1] > y + .5) !== (b[1] > y + .5)) {
+        cuts.push(a[0] + (y + .5 - a[1]) * (b[0] - a[0]) / (b[1] - a[1]));
+      }
+    }
+    cuts.sort((a, b) => a - b);
+    for (let i = 0; i + 1 < cuts.length; i += 2) {
+      const x = Math.ceil(cuts[i] - .5);
+      tile.rect(x, y, Math.ceil(cuts[i+1] - .5) - x, 1, color);
+    }
   }
 }
 
-function strata(tile, type, biome, rng, phase) {
-  const earth = ramp('earth', biome);
+const cuts = {
+  // Four different exposed foundations: shale, sandstone, basalt and glacial till.
+  forest: ['181c32','292a43','423648','614c51','816253','aa8867','a8ad80'],
+  desert: ['32213b','532d47','784056','a25554','c87860','e49b6d','f4c086'],
+  volcano: ['17172c','27263e','3a3046','514055','715463','a67068','e8a078'],
+  snow: ['28324d','3a4762','515f7e','657f9a','86a2b2','abc6c9','d3dfd7'],
+};
+
+function strata(tile, type, biome, rng) {
+  const district = biomes[biome];
+  const rock = cuts[district];
   const cap = ramp(type === 'oasis' ? 'grass' : type, biome);
-  const outcrop = between(rng, 13, 49);
-  const cleft = between(rng, 69, 103);
-  const rocky = type === 'burnt' || type === 'riverbed';
-  tile.paint((x, y) => {
-    const field = contours(x, y, phase);
-    const lip = 8 + 4 * sin(x * .09 + phase) + 2 * sin(x * .24);
-    if (y < lip) return cap[y < 2 ? 5 : 3];
-    if (y < lip + 4) return earth[0];
-    const fault = x + y * .17 > cleft ? 8 : 0;
-    const depth = y + 8 * sin(x * .047 + phase) + x * .11 + fault;
-    const lamina = Math.floor(depth / 22);
-    const seam = depth - lamina * 22;
-    // Outcrops cross the bands, with a broken lip and shaded fracture faces.
-    const ledge = Math.abs(x - outcrop - y * .18) + Math.abs(y - 50) * .87;
-    if (ledge < (rocky ? 41 : 32)) {
-      if (ledge > (rocky ? 37 : 28)) return earth[y < 46 ? 5 : 0];
-      return earth[y < 44 + (x - outcrop) * .28 ? 4 : field > .08 ? 2 : 1];
+  const pick = (lo, hi) => lo + Math.floor(rng() * (hi - lo + 1));
+  tile.paint(() => rock[1]);
+  // Draw overlapping rock plates from the base up. Each has a long lit
+  // cutting plane, a broad middle face, and one broken, cooler return face.
+  const massive = district === 'volcano' || type === 'burnt';
+  const heights = massive ? [119,81,46,14] : [118,95,68,42,17];
+  for (const [tier,y] of heights.entries()) {
+    let x = -pick(19,43);
+    while (x < SIZE) {
+      const w = massive ? pick(19,38) : pick(33,59);
+      const h = massive ? pick(35,49) : pick(25,38);
+      const d = pick(3,8);
+      const yy = y + pick(-3,3);
+      const muted = tier === 0 ? 0 : 1;
+      const grain = pick(0,2) === 0 ? 1 : 0;
+      const shape = (pts, c) => polygon(tile, pts.map(([u,v])=>[x+u, yy+v]), c);
+      shape([[0,4],[w*.26,0],[w-6,-3],[w,2],[w-1,h*.56],[w-d,h-2],[w*.35,h+1],[2,h-3]],
+        rock[2+muted]);
+      shape([[0,4],[w*.26,0],[w-6,-3],[w,2],[w-d,5],[w*.32,6],[4,9]],rock[3+muted+grain]);
+      shape([[w-d,5],[w,2],[w-1,h*.56],[w-d,h-2],[w*.6,h],[w*.77,h*.64]],rock[2]);
+      if (tier > 0 && rng() < .65) {
+        shape([[4,5],[w*.28,1],[w*.58,0],[w*.43,2],[w*.23,3],[9,6]],rock[5]);
+      }
+      if (district === 'desert' || district === 'snow') {
+        shape([[0,h*.58],[w*.32,h*.50],[w*.66,h*.46],[w*.54,h*.53],[w*.29,h*.57],[1,h*.68]],
+          rock[district === 'snow' ? 4 : 2]);
+      }
+      x += w;
     }
-    if (Math.abs(x + y * .17 - cleft) < 2 && y > 29) return earth[0];
-    if (y > 104) return earth[seam < 3 ? 0 : 1];
-    if (seam < 2 && field > .01) return earth[5];
-    if (seam < 5 && field > -.3) return earth[1];
-    return earth[[3,2,4,2,3,2,1][Math.abs(lamina) % 7]];
-  });
-  for (let i = 0; i < (rocky ? 13 : 7); i++) {
-    stone(tile, between(rng, 0, SIZE), between(rng, 24, 97), between(rng, 2, rocky ? 7 : 5), earth);
   }
-  if (type === 'grass' || type === 'oasis') {
-    for (let i = 0; i < 5; i++) {
-      const x = between(rng, 2, SIZE - 3);
-      const y = between(rng, 16, 30);
-      tile.line(x, 8, x + 1, y, earth[5], 2);
-      tile.line(x + 1, y - 3, x - 3, y + 4, earth[4]);
+  // Surface lips use different silhouettes: rooted sod, brittle char, a
+  // saturated waterline and dry gravel all read when a parcel flips.
+  const wet = type === 'river' || type === 'oasis';
+  const sod = type === 'grass' || type === 'oasis';
+  let x = -5;
+  while (x < SIZE) {
+    const w = pick(17,37);
+    const h = wet ? pick(10,15) : pick(7,14);
+    polygon(tile, [[x,0],[x+w,0],[x+w,h-2],[x+w*.82,h+2],[x+w*.38,h+1],[x+5,h+5],[x,h+3]],rock[0]);
+    polygon(tile, [[x,0],[x+w,0],[x+w,h-3],[x+w*.8,h-1],[x+w*.35,h-2],[x+4,h+1],[x,h]],cap[3]);
+    polygon(tile, [[x,0],[x+w,0],[x+w,2],[x+w*.43,3],[x+3,6],[x,5]],cap[5]);
+    if (sod) {
+      polygon(tile, [[x+4,h-2],[x+10,h-1],[x+7,h+8],[x+5,h+13],[x+5,h+4],[x+2,h+4]],cap[2]);
+      tile.line(x+6,h+8,x+2,h+15,rock[4]);
+    } else if (wet) {
+      tile.line(x+3,h-4,x+Math.floor(w*.55),h-5,cap[5],1);
+    } else if (type === 'burnt') {
+      polygon(tile, [[x+10,0],[x+15,0],[x+10,h-3],[x+8,h+3],[x+8,6]],rock[0]);
+    } else if (type === 'riverbed') {
+      polygon(tile, [[x+4,3],[x+9,1],[x+14,3],[x+11,7],[x+5,6]],cap[6]);
     }
+    x += w;
   }
 }
-
-// Side faces remain editable stepped strata, while tops use the painted master.
 fs.mkdirSync(OUT, {recursive: true});
 for (const [index, type] of types.entries()) {
   const parts = [];
@@ -204,9 +224,7 @@ for (const [index, type] of types.entries()) {
     for (let variant = 0; variant < 4; variant++) {
       const rng = random(173221 + index * 13217 + variant * 3911 + biome * 11267);
       const tile = new Tile();
-      const phase = rng() * Math.PI * 2;
-      strata(tile, type, biome, rng, phase);
-
+      strata(tile, type, biome, rng);
       parts.push(tile.toSvg(variant, biome));
     }
   }

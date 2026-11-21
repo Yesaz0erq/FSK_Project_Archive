@@ -78,6 +78,16 @@ func _ready() -> void:
 	for model_group: String in GROUPS:
 		for id: String in GROUPS[model_group]:
 			if not wanted.has(id): continue
+			if id in ACTIVE_IDS or id in PHASE_IDS:
+				# Use the exact painted, articulated volume seen on a playable parcel.
+				var model: Node3D = load("res://assets/models/flora/%s.scn" % id).instantiate()
+				stage.add_child(model)
+				var captured: bool = await _bake_growth(id) if id in PHASE_IDS else await _bake(id, model)
+				model.free()
+				if not captured:
+					get_tree().quit(1)
+					return
+				continue
 			var source: Script = load("res://tools/machine_models/%s.gd" % model_group)
 			if not source or not source.can_instantiate():
 				push_error("Cannot load 3D model source for " + id)
@@ -110,7 +120,7 @@ func _grab() -> Image:
 	pixels.convert(Image.FORMAT_RGBA8)
 	return pixels
 
-func _bake(id: String, kit: RefCounted) -> bool:
+func _bake(id: String, kit: Object) -> bool:
 	var cell := Layout.CAPTURE_SIZE
 	var crop_frame := Rect2i((Vector2i(cell, cell) - Layout.FRAME) / 2, Layout.FRAME)
 	var atlas := Image.create(Layout.FRAME.x * Layout.POSES, Layout.FRAME.y * Layout.DIRECTIONS, false, Image.FORMAT_RGBA8)

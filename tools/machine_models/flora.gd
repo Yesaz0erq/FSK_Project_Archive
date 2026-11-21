@@ -3,16 +3,16 @@ extends RefCounted
 ## The four seed spoons and gathering fronds correspond to their cardinal plots.
 ## The extractor feeds its canister through eight separate radial root intakes.
 
-const ROOT := "554056"
-const ROOT_LIT := "866058"
-const BRONZE := "a67051"
-const BRASS := "dbad68"
-const PATINA := "396f6b"
-const DEEP := "26384c"
-const JADE := "538e74"
-const LIME := "a6b76d"
-const SEED := "!efc67d"
-const ESSENCE := "!74cfb1"
+const ROOT := "422d52"
+const ROOT_LIT := "88526a"
+const BRONZE := "a25a47"
+const BRASS := "ecae5e"
+const PATINA := "25665f"
+const DEEP := "272e4e"
+const JADE := "398669"
+const LIME := "aabf58"
+const SEED := "!ffcf73"
+const ESSENCE := "!85f1d6"
 
 static func build(id: String, k) -> void:
 	match id:
@@ -37,8 +37,8 @@ static func _pod(k, parent: Node3D, origin: Vector3, size: float) -> void:
 	var seed: Node3D = k.group(parent, origin)
 	seed.scale = Vector3.ONE * size
 	k.ellipsoid(seed,Vector3.UP*0.11,Vector3(0.16,0.27,0.16),SEED,9,5)
-	k.leaf(seed,Vector3(0,-0.04,0),Vector3(0.12,0.27,0.035),0.14,0.065,"aa7273","794d65")
-	k.leaf(seed,Vector3(0,-0.04,0),Vector3(-0.085,0.24,-0.075),0.15,0.052,"c08e6a","87595d")
+	k.leaf(seed,Vector3(0,-0.04,0),Vector3(0.13,0.30,0.045),0.17,0.075,"df6c59","92365a")
+	k.leaf(seed,Vector3(0,-0.04,0),Vector3(-0.10,0.25,-0.095),0.17,0.065,"f09358","a74757")
 
 static func _seed_head(k) -> void:
 	_root_fan(k,4,0.65)
@@ -63,16 +63,16 @@ static func _seed_head(k) -> void:
 		var elbow := r*0.42 + Vector3.UP*0.08 + side*0.085
 		var end := r*0.65 + side*0.15 + Vector3.UP*0.15
 		k.tube(head,[r*0.10,elbow,end],0.046,PATINA,8)
-		k.leaf(head,elbow-side*0.07,end+side*0.17+Vector3.UP*0.10,0.27,0.07,LIME,JADE)
+		k.leaf(head,elbow-side*0.075,end+side*0.21+Vector3.UP*0.14,0.33,0.10,LIME,JADE)
 		k.ellipsoid(head,end-side*0.02,Vector3(0.18,0.11,0.18),BRASS,8,3)
 		_pod(k,head,end+Vector3.UP*0.05,0.83)
 	# A seedhead opens in the center; its brass calyx keeps young seeds upright.
 	for i in 6:
 		var radial := _dir(i,6,0.15)
 		var shoot := Vector3.UP * 1.56
-		k.leaf(k.root,shoot,shoot+radial*0.24+Vector3.UP*0.52,0.18,0.12,LIME if i%2 else JADE,"587666")
-		_pod(k,k.root,shoot+radial*0.12+Vector3.UP*0.235,0.90)
-	_pod(k,k.root,Vector3.UP*2.00,0.92)
+		k.leaf(k.root,shoot,shoot+radial*0.35+Vector3.UP*(0.46 if i%2 else 0.56),0.24,0.13,"dd6659" if i%2 else "ef8f53","93375b")
+		_pod(k,k.root,shoot+radial*0.15+Vector3.UP*0.235,0.94)
+	_pod(k,k.root,Vector3.UP*2.00,1.03)
 
 static func _collecting_rosette(k) -> void:
 	_root_fan(k,4,0.67)
@@ -92,8 +92,11 @@ static func _collecting_rosette(k) -> void:
 		var verts: Array = []
 		var left: Array = []
 		var right: Array = []
+		var cup_uv := PackedVector2Array()
 		var keel: Array[Vector3] = []
 		for s: Vector3 in [Vector3(0.13,0.00,0.075),Vector3(0.27,0.08,0.24),Vector3(0.47,0.21,0.33),Vector3(0.66,0.43,0.24),Vector3(0.77,0.62,0.11),Vector3(0.80,0.73,0.008)]:
+			var v := 1.0 - float(verts.size()) / 15.0
+			cup_uv.append_array(PackedVector2Array([Vector2(0,v), Vector2(.5,v),Vector2(1,v)]))
 			var center := Vector3(0,s.y,s.x)
 			verts.append(center + Vector3(-s.z,s.z*0.48,0))
 			verts.append(center)
@@ -103,18 +106,20 @@ static func _collecting_rosette(k) -> void:
 				var n := verts.size()-3
 				left.append([n-3,n,n+1,n-2])
 				right.append([n-2,n+1,n+2,n-1])
-		k.mesh(shell,verts,left,"4c9690")
-		k.mesh(shell,verts,right,"2a686c")
-		k.tube(shell,keel,0.015,BRASS,6)
+		k.mesh(shell,verts,left,"369e99",cup_uv)
+		k.mesh(shell,verts,right,"256673",cup_uv)
+		k.tube(shell,keel,0.019,"a1d59d",6)
 		for side: float in [-1.0,1.0]:
-			k.tube(shell,[Vector3(side*0.10,0.042,0.18),Vector3(side*0.27,0.29,0.47),Vector3(side*0.16,0.46,0.65),Vector3(0,0.735,0.80)],0.022,"9abe92",7)
+			k.tube(shell,[Vector3(side*0.10,0.042,0.18),Vector3(side*0.27,0.29,0.47),Vector3(side*0.16,0.46,0.65),Vector3(0,0.735,0.80)],0.026,"97cda2",7)
+			# A forked enamel stripe runs with the folded faces of each open cup.
+			k.mesh(shell,[Vector3(side*.018,.216,.468),Vector3(side*.018,.251,.502),Vector3(side*.21,.363,.557),Vector3(side*.22,.343,.540)],[[0,1,2,3]],"60bfb0")
 		var dew: Node3D = k.ellipsoid(shell,Vector3(0,0.36,0.54),Vector3(0.085,0.095,0.085),ESSENCE,9,5)
 		k.motion(dew,"slide",Vector3(0,0.7,0.7),0.10)
 	k.frustum(k.root,Vector3.UP*1.16,0.15,0.21,0.27,"574757",12)
 	k.ring(k.root,Vector3.UP*1.25,0.19,0.034,BRASS,12)
 	var pearl: Node3D = k.group(k.root,Vector3.UP*1.50)
 	k.motion(pearl,"slide",Vector3.UP,0.085)
-	k.ellipsoid(pearl,Vector3.ZERO,Vector3(0.29,0.36,0.29),"!99d888",10,5)
+	k.ellipsoid(pearl,Vector3.ZERO,Vector3(0.36,0.40,0.36),"!a3ecc3",8,4)
 	k.ring(pearl,Vector3.UP*0.014,0.174,0.016,BRASS,12)
 
 static func _sap_pump(k) -> void:
@@ -133,8 +138,8 @@ static func _sap_pump(k) -> void:
 	k.frustum(vessel,Vector3.UP*1.08,0.81,0.34,0.34,"39656b",12)
 	var charge: Node3D = k.group(vessel,Vector3.UP*0.96)
 	k.motion(charge,"slide",Vector3.UP,0.055,0.125)
-	k.frustum(charge,Vector3.ZERO,0.54,0.347,0.349,"58af9c",12)
-	k.ring(charge,Vector3.UP*0.26,0.346,0.015,ESSENCE,12)
+	k.frustum(charge,Vector3.ZERO,0.54,0.347,0.349,"36a7a0",12)
+	k.ring(charge,Vector3.UP*0.26,0.346,0.024,ESSENCE,12)
 	k.ellipsoid(vessel,Vector3.UP*1.47,Vector3(0.71,0.32,0.71),"8b7765",12,4)
 	for y in [0.71,1.42]:
 		k.ring(vessel,Vector3.UP*y,0.345,0.042,BRASS,16)
@@ -142,7 +147,7 @@ static func _sap_pump(k) -> void:
 		var r := _dir(i,4)
 		k.rod(vessel,r*0.35+Vector3.UP*0.73,r*0.35+Vector3.UP*1.41,0.029,BRONZE,8)
 	k.frustum(vessel,Vector3.UP*1.61,0.16,0.118,0.16,PATINA,10)
-	k.tube(k.root,[tank+Vector3.UP*1.64,Vector3(-0.09,1.92,-0.16),Vector3(0.20,2.02,-0.17),Vector3(0.45,1.90,-0.11),Vector3(0.47,1.48,-0.06)],0.061,BRASS,8)
+	k.tube(k.root,[tank+Vector3.UP*1.64,Vector3(-0.09,1.92,-0.16),Vector3(0.20,2.02,-0.17),Vector3(0.45,1.90,-0.11),Vector3(0.47,1.48,-0.06)],0.079,BRASS,8)
 	var pump := Vector3(0.43,0,-0.04)
 	k.frustum(k.root,pump+Vector3.UP*0.68,0.54,0.144,0.119,DEEP,10)
 	var piston: Node3D = k.group(k.root,pump+Vector3.UP*0.88)
@@ -151,7 +156,8 @@ static func _sap_pump(k) -> void:
 	k.ring(piston,Vector3.UP*0.30,0.113,0.027,BRASS,10)
 	k.frustum(k.root,pump+Vector3.UP*1.39,0.23,0.127,0.13,PATINA,10)
 	# Mechanical dial with a working needle on the tank shoulder.
-	var dial: Node3D = k.group(k.root,Vector3(0.0,1.48,0.255))
+	var dial: Node3D = k.group(k.root,Vector3(0.0,1.48,0.272))
+	dial.scale = Vector3.ONE * 1.19
 	dial.rotation.y = 0.34
 	var housing: Node3D = k.frustum(dial,Vector3.ZERO,0.09,0.165,0.165,BRASS,14)
 	housing.rotation.x=PI*0.5
@@ -159,7 +165,7 @@ static func _sap_pump(k) -> void:
 	face.rotation.x=PI*0.5
 	var needle: Node3D = k.group(dial,Vector3(0,0,0.071))
 	k.motion(needle,"swing",Vector3.BACK,0.32,0.15)
-	k.rod(needle,Vector3.ZERO,Vector3(-0.052,0.083,0.0),0.012,ROOT,6)
+	k.rod(needle,Vector3.ZERO,Vector3(-0.052,0.083,0.0),0.019,"9c364a",6)
 	for i in 3:
 		var r := _dir(i,3,0.15)
 		k.leaf(k.root,Vector3.UP*0.52+r*0.26,Vector3.UP*0.78+r*0.53,0.18,0.13,JADE,PATINA)

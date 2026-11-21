@@ -1,11 +1,10 @@
-// Entry point for rebuilding the full set of terrain art (Node + Python + Pillow).
+// Rebuild the parcel cuts, surface paintings and mineral pigments (Python, Pillow, NumPy).
 const path = require('node:path');
 const {execFileSync} = require('node:child_process');
 
 require('./make_terrain_textures_hd.cjs');
-const bake = path.join(__dirname, 'bake_terrain_tops.py');
-if (process.platform === 'win32') {
-  execFileSync('py', ['-3', bake], {stdio: 'inherit'});
-} else {
-  execFileSync('python3', [bake], {stdio: 'inherit'});
+const windows = process.platform === 'win32';
+for (const source of ['bake_terrain_tops.py', 'paint_deposits.py']) {
+  const script = path.join(__dirname, source);
+  execFileSync(windows ? 'py' : 'python3', windows ? ['-3', script] : [script], {stdio: 'inherit'});
 }

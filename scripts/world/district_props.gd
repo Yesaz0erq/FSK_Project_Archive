@@ -2,8 +2,11 @@ extends Node3D
 ## Volumetric specimens. Each sculpt is built once, then instanced throughout
 ## a district with its roots on the same height field as the playable plots.
 
-const SPECIMEN_MATERIAL := preload("res://assets/shaders/district_specimen.gdshader")
+const SPECIMEN_MATERIAL := preload("res://assets/shaders/district_specimen.tres")
 const PLOT_EDGE := 8.8
+# Row-major slots in the painted albedo atlas.
+enum Paint { BASALT, CANOPY, BELL, BARK, SANDSTONE, QUARTZ, SNOW, CEDAR,
+	MAGMA, FIR, AGAVE, SALT, BRONZE, SULFUR, REED, FRUIT }
 const SPECIES := {
 	"forest": ["elder", "bough", "fern", "bells"],
 	"desert": ["arch", "hoodoo", "agave", "salt"],
@@ -11,7 +14,6 @@ const SPECIES := {
 	"snow": ["fir", "ice_spire", "juniper", "frost"],
 }
 static var _models: Dictionary = {}
-static var _material: ShaderMaterial
 var _st: SurfaceTool
 var _sculpt := RandomNumberGenerator.new()
 var _locations := RandomNumberGenerator.new()
@@ -104,10 +106,7 @@ func _model(kind: String, key: String) -> ArrayMesh:
 		"ice_spire": _ice_spire()
 		"juniper": _juniper()
 		"frost": _frost()
-	if _material == null:
-		_material = ShaderMaterial.new()
-		_material.shader = SPECIMEN_MATERIAL
-	_st.set_material(_material)
+	_st.set_material(SPECIMEN_MATERIAL)
 	_st.index()
 	return _st.commit()
 
@@ -150,14 +149,14 @@ func _band(a: Vector3, b: Vector3, lower: Vector2, upper: Vector2, ring: PackedV
 		_face(a, q, p, base.darkened(0.17), tissue, sway)
 		if lid: _face(b, s, r, cap.darkened(_sculpt.randf_range(0.0, 0.06)), tissue, sway)
 
-func _stick(a: Vector3, b: Vector3, r1: float, r2: float, color: Color, n := 6, tissue := 0.0, sway := 0.0) -> void:
+func _stick(a: Vector3, b: Vector3, r1: float, r2: float, color: Color, n := 6, tissue := 3.0, sway := 0.0) -> void:
 	var axis := Basis(Quaternion(Vector3.UP, (b - a).normalized()))
 	_band(a, b, Vector2.ONE * r1, Vector2.ONE * r2, _rim(_sculpt.randf() * TAU, n, 0.05), axis, color, color.lightened(0.10), tissue, sway)
 
 func _radial(angle: float, radius: float, y: float) -> Vector3:
 	return Vector3(cos(angle) * radius, y, sin(angle) * radius)
 
-func _leaf(start: Vector3, angle: float, reach: float, rise: float, width: float, color: Color, curl := 0.2) -> void:
+func _leaf(start: Vector3, angle: float, reach: float, rise: float, width: float, color: Color, curl := 0.2, paint := Paint.CANOPY) -> void:
 	var along := _radial(angle, 1.0, 0)
 	var across := along.cross(Vector3.UP) * width
 	var shoulder := start + along * reach * 0.48 + Vector3.UP * rise * 0.80
@@ -172,15 +171,34 @@ func _leaf(start: Vector3, angle: float, reach: float, rise: float, width: float
 		var c: Vector3 = data[2]
 		var mid := (a + b + c) / 3.0 - shoulder
 		var face_color := color if mid.dot(across) < 0.0 else color.darkened(0.18)
-		_face(a, c, b, face_color, 1.0, 0.75)
+		_face(a, c, b, face_color, paint, 0.75)
 
-func _crown(center: Vector3, radius: float, height: float, base: Color, top: Color) -> void:
-	var ring := _rim(_sculpt.randf() * TAU, 9, 0.22)
-	var r := Vector2(radius, radius * _sculpt.randf_range(0.76, 1.08))
-	var crown := center + Vector3(0.04, height * 0.34, 0.06)
-	_band(center - Vector3.UP * height * 0.50, center, r * 0.34, r, ring, Basis.IDENTITY, base.darkened(0.20), base, 1, 0.45, false)
-	_band(center, crown, r, r * 0.70, ring, Basis.IDENTITY, base, top, 1, 0.65, false)
-	_band(crown, center + Vector3.UP * height * 0.56, r * 0.70, r * 0.22, ring, Basis.IDENTITY, top.darkened(0.08), top, 1, 0.68)
+func _crown(center: Vector3, radius: float, height: float, base: Color, top: Color, paint := Paint.CANOPY) -> void:
+	# Each leaf fan has a long hanging tip and a sheltered notch. Its upper
+	# fold and dropped outer edge read separately even at board zoom.
+	var lobes := 7 if radius > .65 else 4
+	var phase := _sculpt.randf() * TAU
+	var rim := PackedVector3Array()
+	var shoulder := PackedVector3Array()
+	var apex := center + Vector3(-.12*radius,.53*height,.09*radius)
+	var root := center - Vector3.UP*.37*height
+	for lobe in lobes:
+		var angle := phase + TAU*lobe/lobes
+		var reach := _sculpt.randf_range(.82,1.13)*radius
+		var drop := _sculpt.randf_range(.16,.32)*height
+		for point in 3:
+			var a: float = angle + TAU/lobes*[0.0,.33,.62][point]
+			var contour: float = reach * [0.68,.96,1.04][point]
+			var edge_y: float = height*[.15,.02,0.0][point] - (drop if point == 2 else 0.)
+			rim.append(center + _radial(a,contour,edge_y))
+			shoulder.append(center + _radial(a-.07,contour*.59,height*(.30 if point == 0 else .40)))
+	for i in rim.size():
+		var k := (i+1)%rim.size()
+		var crease := base.darkened(.20) if i%3 == 2 else base
+		_face(root,rim[k],rim[i],base.darkened(.22),paint,.43)
+		_face(rim[i],rim[k],shoulder[k],crease,paint,.65)
+		_face(rim[i],shoulder[k],shoulder[i],crease,paint,.65)
+		_face(apex,shoulder[i],shoulder[k],top,paint,.61)
 
 func _elder() -> void:
 	var bark := Color("65504f")
@@ -215,7 +233,7 @@ func _elder() -> void:
 			_stick(perch, forklet, 0.093, 0.045, bark)
 			for j in 3:
 				var cap := forklet + _radial(j * 2.1, 0.17, -0.08)
-				_crown(cap, 0.15, 0.18, Color("9e789d"), Color("d6acbf"))
+				_crown(cap, 0.15, 0.18, Color("9e789d"), Color("d6acbf"), Paint.FRUIT)
 	_crown(fork + Vector3.UP * 1.45, 1.94, 1.52, jade, Color("b3ba70"))
 
 func _bough() -> void:
@@ -253,14 +271,14 @@ func _bells(base := Vector3.ZERO) -> void:
 		_band(q, q + Vector3.UP * 0.04, Vector2.ONE * rad * 0.63, Vector2.ONE * rad, ring, Basis.IDENTITY, Color("5cb7ad"), Color("86e7cc"), 2)
 		_band(q + Vector3.UP * 0.04, q + Vector3.UP * (rad + 0.03), Vector2.ONE * rad, Vector2.ONE * 0.018, ring, Basis.IDENTITY, Color("63c9bd"), Color("e4f7bf"), 2)
 
-func _sandstone(center: Vector3, width: Vector2, height: float, breadth: Array, tones: Array, drift: Vector2) -> void:
+func _sandstone(center: Vector3, width: Vector2, height: float, breadth: Array, tones: Array, drift: Vector2, paint := Paint.SANDSTONE) -> void:
 	var ring := _rim(_sculpt.randf() * TAU, 9, 0.15)
 	var previous := center
 	for i in range(1, breadth.size()):
 		var f := float(i) / (breadth.size() - 1)
 		var top := center + Vector3(drift.x * f, f * height, drift.y * f)
 		var color: Color = tones[(i - 1) % tones.size()]
-		_band(previous, top, width * float(breadth[i - 1]), width * float(breadth[i]), ring, Basis.IDENTITY, color, color.lightened(0.16))
+		_band(previous, top, width * float(breadth[i - 1]), width * float(breadth[i]), ring, Basis.IDENTITY, color, color.lightened(0.16), paint)
 		previous = top
 
 func _hoodoo() -> void:
@@ -293,28 +311,28 @@ func _agave() -> void:
 			var a := (k + j * 0.47) * TAU / (8 - j)
 			var reach := (0.90 - 0.22 * j) * _sculpt.randf_range(0.82, 1.14)
 			var color := Color("699b91").lerp(Color("aec391"), j * 0.29)
-			_leaf(Vector3.UP * j * 0.052, a, reach, 0.37 + j * 0.20, 0.138 - j * 0.027, color, 0.13)
+			_leaf(Vector3.UP * j * 0.052, a, reach, 0.37 + j * 0.20, 0.138 - j * 0.027, color, 0.13, Paint.AGAVE)
 	var sprig := Vector3(0.05, 1.17, -0.08)
 	_stick(Vector3.ZERO, sprig, 0.042, 0.026, Color("927e66"), 4)
 	for j in 6:
 		var bud := sprig * (0.73 + j * 0.044)
-		_stick(bud, bud + _radial(j * 2.39, 0.12, 0.082), 0.048, 0.015, Color("f2bf78"), 5)
+		_stick(bud, bud + _radial(j * 2.39, 0.12, 0.082), 0.048, 0.015, Color("f2bf78"), 5, Paint.SULFUR)
 
 func _salt() -> void:
 	for i in 6:
 		var p := _radial(_sculpt.randf() * TAU, _sculpt.randf_range(0.05, 0.57), -0.09)
 		var h := _sculpt.randf_range(0.14, 0.43)
-		_sandstone(p, Vector2(h * 0.81, h), h, [0.94, 0.88, 0.63], [Color("a594a2"), Color("e1c6c4")], Vector2(0.06, -0.03))
+		_sandstone(p, Vector2(h * 0.81, h), h, [0.94, 0.88, 0.63], [Color("a594a2"), Color("e1c6c4")], Vector2(0.06, -0.03), Paint.SALT)
 
-func _basalt(point: Vector3, radius: float, h: float, top: Color, hot := false) -> void:
+func _basalt(point: Vector3, radius: float, h: float, top: Color, hot := false, mineral := Paint.BASALT) -> void:
 	var ring := _rim(0.19, 6, 0.07)
 	var base := point - Vector3.UP * 0.17
 	var middle := point + Vector3(0.075, h * 0.62, -0.02)
 	var neck := middle + Vector3(0, 0.055 + 0.023 * h, 0)
-	_band(base, middle, Vector2.ONE * radius * 1.09, Vector2.ONE * radius, ring, Basis.IDENTITY, Color("3f354b"), top)
+	_band(base, middle, Vector2.ONE * radius * 1.09, Vector2.ONE * radius, ring, Basis.IDENTITY, Color("3f354b"), top, mineral)
 	var seam := Color("fa8847") if hot else Color("635366")
-	_band(middle, neck, Vector2.ONE * radius, Vector2.ONE * radius * 0.97, ring, Basis.IDENTITY, seam, seam, 2.0 if hot else 0.0)
-	_band(neck, point + Vector3(0.14, h, -0.06), Vector2.ONE * radius * 0.97, Vector2.ONE * radius * 0.87, ring, Basis.IDENTITY, Color("554763"), top)
+	_band(middle, neck, Vector2.ONE * radius, Vector2.ONE * radius * 0.97, ring, Basis.IDENTITY, seam, seam, Paint.MAGMA if hot else mineral)
+	_band(neck, point + Vector3(0.14, h, -0.06), Vector2.ONE * radius * 0.97, Vector2.ONE * radius * 0.87, ring, Basis.IDENTITY, Color("554763"), top, mineral)
 
 func _organ() -> void:
 	for k in 9:
@@ -343,11 +361,11 @@ func _chimney() -> void:
 		var far_pit := _v(ring, j, top - Vector3.UP * 0.29, r * 0.57, Basis.IDENTITY)
 		_face(lip, far_lip, far_rim, Color("b67574"), 0, 0)
 		_face(lip, far_rim, rim, Color("bb7f76"), 0, 0)
-		_face(rim, far_rim, far_pit, Color("e47754"), 2, 0)
-		_face(rim, far_pit, pit, Color("ba5854"), 2, 0)
-		_face(top - Vector3.UP * 0.34, pit, far_pit, Color("ffae56"), 2, 0)
+		_face(rim, far_rim, far_pit, Color("e47754"), Paint.MAGMA, 0)
+		_face(rim, far_pit, pit, Color("ba5854"), Paint.MAGMA, 0)
+		_face(top - Vector3.UP * 0.34, pit, far_pit, Color("ffae56"), Paint.MAGMA, 0)
 
-func _crystal(point: Vector3, h: float, radius: float, lean: Vector3, base: Color, lit: Color, tissue := 0.0) -> void:
+func _crystal(point: Vector3, h: float, radius: float, lean: Vector3, base: Color, lit: Color, tissue := 5.0) -> void:
 	var axis := Basis(Quaternion(Vector3.UP, (Vector3.UP * h + lean).normalized()))
 	var ring := _rim(0.19, 5, 0.12)
 	var bottom := point - Vector3.UP * 0.12
@@ -360,12 +378,12 @@ func _cinder() -> void:
 	for k in 5:
 		var p := _radial(k * 2.4, sqrt(float(k)) * 0.24, 0)
 		var h := _sculpt.randf_range(0.24, 0.84)
-		_crystal(p, h, h * 0.29, p * 0.67, Color("684451"), Color("eb8260"), 2 if k == 1 else 0)
+		_crystal(p, h, h * 0.29, p * 0.67, Color("684451"), Color("eb8260"), Paint.MAGMA if k == 1 else Paint.BASALT)
 
 func _sulfur() -> void:
 	for k in 6:
 		var p := _radial(k * 2.4, sqrt(float(k)) * 0.24, 0)
-		_basalt(p, _sculpt.randf_range(0.19, 0.39), _sculpt.randf_range(0.19, 0.51), Color("ae9869"), k == 1)
+		_basalt(p, _sculpt.randf_range(0.19, 0.39), _sculpt.randf_range(0.19, 0.51), Color("ae9869"), k == 1, Paint.SULFUR)
 
 func _fir() -> void:
 	var h := _sculpt.randf_range(4.5, 6.6)
@@ -386,12 +404,12 @@ func _fir() -> void:
 			var tip_next := tip.lerp(next, 0.36) - Vector3.UP * 0.09
 			var cut := tip.lerp(apex, _sculpt.randf_range(0.22, 0.42))
 			var cut_next := next.lerp(apex, _sculpt.randf_range(0.25, 0.49))
-			_face(spine, tip_next, tip, layers[0], 1, 0.47)
-			_face(spine, next, tip_next, layers[0], 1, 0.47)
-			_face(tip, tip_next, cut, layers[1], 1, 0.52)
-			_face(tip_next, next, cut_next, layers[2], 1, 0.52)
-			_face(tip_next, cut_next, cut, layers[1], 1, 0.52)
-			_face(cut, cut_next, apex, layers[3] if k % 3 == 0 else layers[4], 1, 0.59)
+			_face(spine, tip_next, tip, layers[0], Paint.FIR, 0.47)
+			_face(spine, next, tip_next, layers[0], Paint.FIR, 0.47)
+			_face(tip, tip_next, cut, layers[1], Paint.FIR, 0.52)
+			_face(tip_next, next, cut_next, layers[2], Paint.FIR, 0.52)
+			_face(tip_next, cut_next, cut, layers[1], Paint.FIR, 0.52)
+			_face(cut, cut_next, apex, layers[3] if k % 3 == 0 else layers[4], 6, 0.59)
 	_crystal(Vector3.UP * h * 0.90, h * 0.105, 0.10, Vector3.ZERO, Color("86a6ae"), Color("d8edeb"))
 
 func _ice_spire() -> void:
@@ -403,7 +421,7 @@ func _ice_spire() -> void:
 func _juniper() -> void:
 	for k in 6:
 		var p := _radial(k * 2.4, sqrt(float(k)) * 0.19, 0.15)
-		_crown(p, _sculpt.randf_range(0.25, 0.49), _sculpt.randf_range(0.26, 0.47), Color("527977"), Color("cad8da"))
+		_crown(p, _sculpt.randf_range(0.25, 0.49), _sculpt.randf_range(0.26, 0.47), Color("527977"), Color("cad8da"), Paint.FIR if k%3 else Paint.SNOW)
 
 func _frost() -> void:
 	for k in 7:

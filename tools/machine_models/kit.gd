@@ -77,7 +77,7 @@ func ring(parent: Node3D, pos: Vector3, radius: float, tube_radius: float, code:
 	shape.ring_segments = 6
 	return _part(parent, shape, pos, code)
 
-func mesh(parent: Node3D, verts: Array, faces: Array, code: String) -> MeshInstance3D:
+func mesh(parent: Node3D, verts: Array, faces: Array, code: String, uvs := PackedVector2Array()) -> MeshInstance3D:
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for face: Array in faces:
@@ -88,9 +88,10 @@ func mesh(parent: Node3D, verts: Array, faces: Array, code: String) -> MeshInsta
 			var n := (b - a).cross(c - a).normalized()
 			if n.is_zero_approx(): continue
 			# Godot front faces wind clockwise when observed from the outside.
-			for vertex: Vector3 in [a, c, b]:
+			for index: int in [face[0], face[i+1], face[i]]:
+				if not uvs.is_empty(): surface.set_uv(uvs[index])
 				surface.set_normal(n)
-				surface.add_vertex(vertex)
+				surface.add_vertex(verts[index])
 	return _part(parent, surface.commit(), Vector3.ZERO, code)
 
 func leaf(parent: Node3D, base: Vector3, tip: Vector3, width: float, arch: float, code: String, underside: String) -> Node3D:
@@ -101,6 +102,7 @@ func leaf(parent: Node3D, base: Vector3, tip: Vector3, width: float, arch: float
 	var verts: Array[Vector3] = []
 	var left: Array = []
 	var right: Array = []
+	var uvs := PackedVector2Array()
 	# Paired facets and a raised midrib retain a distinct illuminated and shaded half.
 	for i in 7:
 		var t := i / 6.0
@@ -110,12 +112,13 @@ func leaf(parent: Node3D, base: Vector3, tip: Vector3, width: float, arch: float
 		verts.append(center - across * radius)
 		verts.append(center + Vector3.UP * (radius * 0.31))
 		verts.append(center + across * radius)
+		uvs.append_array(PackedVector2Array([Vector2(0,1.-t), Vector2(.5,1.-t), Vector2(1,1.-t)]))
 		if i > 0:
 			var j := i * 3
 			left.append([j-3,j-2,j+1,j])
 			right.append([j-2,j-1,j+2,j+1])
-	mesh(blade, verts, left, code)
-	mesh(blade, verts, right, underside)
+	mesh(blade, verts, left, code, uvs)
+	mesh(blade, verts, right, underside, uvs)
 	return blade
 
 func motion(node: Node3D, kind: String, axis: Vector3, amount: float, offset := 0.0) -> void:

@@ -26,6 +26,11 @@ const SHOWCASE_ZOOM := 28.0
 const SceneryScript := preload("res://scripts/world/scenery.gd")
 const FocusShader := preload("res://assets/shaders/parcel_focus.gdshader")
 const TideCrestShader := preload("res://assets/shaders/tide_crest.gdshader")
+const RootShadow := preload("res://assets/models/flora/root_shadow.tres")
+const DepositPigments := preload("res://assets/terrain/deposit_pigments.png")
+const ORE_SWATCH := {"timber": 0, "resin": 2, "water": 3, "ice": 4, "frost_quartz": 5,
+	"salt": 6, "obsidian": 7, "sulfur": 8, "iron_ore": 9, "copper_ore": 10, "sand": 11}
+static var _ore_materials: Dictionary = {}
 const TerrainSurface := preload("res://assets/models/terrain/terrain_surface.gd")
 
 var biome: String = "forest"
@@ -255,7 +260,7 @@ func _decorate(top: Vector3, parcel: Dictionary, rng: RandomNumberGenerator, par
 				MeshKit.ball(parent, top + off, Vector3(0.36, 0.04, 0.36), Color("8ed0e0"), 6, 2, 0.4)
 
 func _deposit_marker(top: Vector3, resource: String, rng: RandomNumberGenerator, parent: Node3D) -> void:
-	var color := Data.item_color(resource)
+	var paint := int(ORE_SWATCH.get(resource, 11))
 	var cluster := Node3D.new()
 	cluster.name = "Deposit_" + resource
 	cluster.position = top
@@ -265,23 +270,38 @@ func _deposit_marker(top: Vector3, resource: String, rng: RandomNumberGenerator,
 		var angle := TAU * i / 3.0
 		var off := Vector3(cos(angle), 0.0, sin(angle)) * rng.randf_range(0.09, 0.27)
 		var h := rng.randf_range(0.14, 0.38)
+		var piece: MeshInstance3D
 		match resource:
 			"timber":
-				var log_piece := MeshKit.cyl(cluster, off + Vector3.UP * 0.10, 0.088, 0.095, 0.42, color.darkened(0.2), 7)
-				log_piece.rotation = Vector3(PI / 2, i * 0.21, 0.0)
-				MeshKit.cyl(log_piece, Vector3.UP * 0.211, 0.073, 0.073, 0.008, color.lightened(0.29), 7)
+				piece = MeshKit.cyl(cluster, off + Vector3.UP * 0.10, 0.088, 0.095, 0.42, Color.WHITE, 7)
+				piece.rotation = Vector3(PI / 2, i * 0.21, 0.0)
+				var end := MeshKit.cyl(piece, Vector3.UP * .211, .076, .076, .008, Color.WHITE, 7)
+				end.material_override = _ore_material(1)
 			"ice", "frost_quartz", "salt", "obsidian", "sulfur":
-				var stem := MeshKit.cyl(cluster, off + Vector3.UP * h * 0.48, 0.094, 0.12, h, color, 5)
-				stem.rotation = Vector3(cos(angle) * 0.24, angle, sin(angle) * 0.24)
-				MeshKit.cyl(stem, Vector3.UP * (h * 0.5 + 0.062), 0, 0.094, 0.125, color.lightened(0.20), 5)
+				piece = MeshKit.cyl(cluster, off + Vector3.UP * h * 0.48, 0.094, 0.12, h, Color.WHITE, 5)
+				piece.rotation = Vector3(cos(angle) * 0.24, angle, sin(angle) * 0.24)
+				var tip := MeshKit.cyl(piece, Vector3.UP * (h * .5 + .062), 0, .094, .125, Color.WHITE, 5)
+				tip.material_override = _ore_material(paint)
 			"water":
-				MeshKit.ball(cluster, off + Vector3.UP * 0.065, Vector3(0.30, 0.12, 0.29), color.darkened(0.18), 7, 3)
-				MeshKit.ball(cluster, off + Vector3(0.035, 0.12, 0), Vector3(0.088, 0.017, 0.055), color.lightened(0.52), 6, 2)
+				piece = MeshKit.ball(cluster, off + Vector3.UP * .058, Vector3(.32,.14,.29), Color.WHITE, 7, 3)
 			"iron_ore", "copper_ore":
-				MeshKit.ball(cluster, off + Vector3.UP * 0.07, Vector3(0.30, 0.25, 0.26), Color("4d4857"), 6, 3)
-				MeshKit.ball(cluster, off + Vector3(0.05, 0.16, 0.02), Vector3(0.17, 0.09, 0.15), color.lightened(0.20), 5, 2)
+				piece = MeshKit.ball(cluster, off + Vector3.UP * .09, Vector3(.37,.31,.29), Color.WHITE, 5, 3)
+				piece.rotation.y = angle
 			_:
-				MeshKit.ball(cluster, off + Vector3.UP * h * 0.22, Vector3(0.20, h * 0.68, 0.20), color, 7, 4)
+				piece = MeshKit.ball(cluster, off + Vector3.UP * h * .22, Vector3(.22,h * .78,.23), Color.WHITE, 6, 3)
+		piece.material_override = _ore_material(paint)
+
+func _ore_material(slot: int) -> StandardMaterial3D:
+	if not _ore_materials.has(slot):
+		var mat := StandardMaterial3D.new()
+		mat.albedo_texture = DepositPigments
+		mat.uv1_scale = Vector3(23.0/128., 23.0/128., 1)
+		mat.uv1_offset = Vector3((32*(slot%4) + 4.5)/128., (32*floori(slot/4.) + 4.5)/128., 0)
+		mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
+		mat.roughness = .58 if slot in [2, 3, 4, 5, 7] else .92
+		mat.metallic_specular = .21
+		_ore_materials[slot] = mat
+	return _ore_materials[slot]
 
 func set_overlay(mode: String) -> void:
 	overlay = mode
@@ -444,6 +464,7 @@ func _make_machine_node(m: Dictionary) -> Dictionary:
 	var root := Node3D.new()
 	root.position = cell_to_world(m.cell) + Vector3(0, float(Land.get_parcel(biome, m.cell).height), 0)
 	_machine_root.add_child(root)
+	_add_root_shadow(root, 1.0)
 	var model: Node3D = VOLUMES[m.type].instantiate()
 	root.add_child(model)
 	var badge := _label("", Vector3(0, MACHINE_BADGE_HEIGHT, 0), Color("f0b35b"), 30)
@@ -459,6 +480,15 @@ func _make_machine_node(m: Dictionary) -> Dictionary:
 	node.light = light
 	node.pulse = 0.0
 	return node
+
+func _add_root_shadow(root: Node3D, size_factor: float) -> void:
+	var shadow := MeshInstance3D.new()
+	shadow.name = "ContactShadow"
+	shadow.mesh = RootShadow
+	shadow.scale = Vector3(size_factor, 1.0, size_factor)
+	shadow.position.y = .013
+	shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(shadow)
 
 func _update_machine_node(m: Dictionary) -> void:
 	var n: Dictionary = _machine_nodes[m.uid]
@@ -644,6 +674,7 @@ func _refresh_growth_visuals() -> void:
 			var cell := Vector2i(int(g.cell[0]), int(g.cell[1]))
 			_cell_props[cell].add_child(root)
 			root.position = cell_to_world(cell) + Vector3.UP * float(_prop_base_heights[cell])
+			_add_root_shadow(root, .52)
 			var label := _label("",Vector3(0,1.8,0),UITheme.CREAM,26)
 			label.font = UITheme.build().default_font
 			root.add_child(label)

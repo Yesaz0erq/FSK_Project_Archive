@@ -24,4 +24,4 @@
 
 ![四个地区的三维像素实景](docs/landscape-3d.jpg)
 
-[森林近景实机原图（1920×1080）](docs/native-detail-1080.png)
+[同机位像素材质更新对照](docs/hd-pixel-before-after.jpg) · [森林近景实机原图（1920×1080）](docs/native-detail-1080.png)

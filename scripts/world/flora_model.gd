@@ -1,7 +1,7 @@
 extends Node3D
 ## Rigid meshes share one draw surface per moving organ. Pivots retain the
 ## axes, local rest transforms and phase offsets from the source model.
-const PAINT := preload("res://assets/shaders/flora_volume.gdshader")
+const PAINT := preload("res://assets/models/flora/surface_paint.tres")
 static var _finishes: Dictionary = {}
 var _joints: Array[Dictionary] = []
 var _meshes: Array[MeshInstance3D] = []
@@ -32,8 +32,7 @@ func set_finish(tint: Color) -> void:
 	if _finish == tint: return
 	_finish = tint
 	if tint != Color.WHITE and not _finishes.has(tint):
-		var finish := ShaderMaterial.new()
-		finish.shader = PAINT
+		var finish: ShaderMaterial = PAINT.duplicate()
 		finish.set_shader_parameter("finish", tint)
 		_finishes[tint] = finish
 	for part in _meshes:
