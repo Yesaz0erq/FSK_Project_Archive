@@ -34,13 +34,14 @@ func _run() -> void:
 
 	_click(_point(first))
 	_button(MOUSE_BUTTON_RIGHT, true, _point(spare))
-	_check(game.radial.active, "any valid parcel can open the wheel")
 	_check(game.radial.active, "holding right on an unmarked parcel also opens the wheel")
 	_button(MOUSE_BUTTON_RIGHT, false, _point(spare))
 	_check(not game.radial.active and not director.is_armed(), "right release dismisses the wheel")
 	_check(Sim.count("life") == start_life and Sim.growth_at(game.biome, first).is_empty(), "left click alone cannot plant")
 
 	_open(first)
+	if DisplayServer.get_name() != "headless":
+		await _check_optional_icons()
 	await _capture("02-wheel")
 	_click(game.radial.center + Vector2.UP * 85)
 	_check(not director.is_armed(), "disabled sector cannot arm Life")
@@ -48,7 +49,12 @@ func _run() -> void:
 	_button(MOUSE_BUTTON_RIGHT, false, game.radial.center + Vector2.RIGHT * 85)
 	_check(not game.radial.active and not director.is_armed(), "right release alone cancels the wheel")
 	_arm(first)
+	_check(overlay._left and overlay._count == "X1", "first placement shows left click X1")
 	await _capture("03-placement")
+	_click(_point(spare))
+	_check(director.stage == stage.FIRST and Sim.count("life") == start_life, "invalid terrain cannot advance or spend a point")
+	_check(Sim.growth_at(game.biome, spare).is_empty(), "invalid terrain stays empty")
+	if not director.is_armed(): _arm(first)
 	var alternate: Vector2i = director._eligible.filter(func(cell: Vector2i) -> bool: return cell != first)[0]
 	_click(_point(alternate))
 	first = alternate
@@ -62,6 +68,9 @@ func _run() -> void:
 	for cell: Vector2i in [pair[1], pair[0]]:
 		for click in 2:
 			if not director.is_armed(): _arm(cell)
+			if cell == pair[1] and click == 0:
+				_check(overlay._left and overlay._count == "X2", "paired placement shows left click X2")
+				await _capture("05-pair-placement")
 			_click(_point(cell))
 		_check(Sim.growth_at(game.biome, cell).get("stage") == "phase2_2", "two points choose branch 2-2")
 	if not _check(director.stage == stage.WAIT_PROPAGATOR, "both two-point plots enter the first wait"): return
@@ -75,6 +84,7 @@ func _run() -> void:
 	_check(pair.has(last), "third point targets a two-point parcel")
 	await _capture("06-third-parcel")
 	if not director.is_armed(): _arm(last)
+	_check(overlay._left and overlay._count == "X1", "third placement shows left click X1")
 	_click(_point(last))
 	_check(Sim.growth_at(game.biome, last).get("stage") == "phase3_2", "third point chooses branch 3-2")
 	if not _check(director.stage == stage.WAIT_COLLECTOR, "third point starts collector wait"): return
@@ -95,8 +105,23 @@ func _point(cell: Vector2i) -> Vector2:
 	var tile: MeshInstance3D = game.view._tiles[cell]
 	return game.view.camera.unproject_position(tile.to_global(Vector3(0, .31, 0)))
 
+func _check_optional_icons() -> void:
+	var saved: Array = game.radial.options.duplicate(true)
+	for entry: Dictionary in saved:
+		_check(entry.get("icon") is Texture2D, "each tutorial sector supplies its intended artwork")
+	# Exercise the renderer with a missing icon, explicit null and an invalid value.
+	# Keep the active Life sector intact so it still draws alongside these entries.
+	game.radial.options[0].erase("icon")
+	game.radial.options[2]["icon"] = null
+	game.radial.options[3]["icon"] = "ember"
+	game.radial.queue_redraw()
+	await RenderingServer.frame_post_draw
+	game.radial.options = saved
+	game.radial.queue_redraw()
+
 func _other_visible_cell() -> Vector2i:
 	for cell: Vector2i in game.view._tiles:
+		if Land.get_parcel(game.biome, cell).land == "sheet_grass": continue
 		var point := _point(cell)
 		if not director.hints.has(cell) and get_viewport().get_visible_rect().grow(-160).has_point(point) and game.view._pick(point) == cell:
 			return cell
@@ -161,7 +186,8 @@ func _card(machine: String, cell: Vector2i) -> void:
 
 func _capture(label: String) -> void:
 	if output_dir.is_empty(): return
-	await get_tree().process_frame
+	# Capture the settled guide after the wheel's reveal tween.
+	await get_tree().create_timer(.25).timeout
 	await RenderingServer.frame_post_draw
 	var image := get_viewport().get_texture().get_image()
 	_check(image.save_png(output_dir.path_join(label + ".png")) == OK, "capture " + label)

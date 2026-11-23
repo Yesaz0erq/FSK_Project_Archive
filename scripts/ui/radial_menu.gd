@@ -169,7 +169,8 @@ func _draw() -> void:
 		var cursor := center + Vector2.from_angle(angle) * (INNER + 11)
 		draw_rect(Rect2(cursor.round() - Vector2(2,2), Vector2(4,4)), rim)
 		if _click_to_choose:
-			var icon: Texture2D = options[i].icon
+			var icon: Variant = options[i].get("icon")
+			if not icon is Texture2D: continue
 			var icon_center := center + Vector2.from_angle(angle) * 83.0 * _aperture
 			if enabled: icon_center.y -= 8.0
 			var size := Vector2(32,32)

@@ -184,10 +184,10 @@ func _open_context(cell: Vector2i, point: Vector2) -> void:
 		if Land.in_grid(cell) and tutorial.open_menu(cell):
 			var label := "投放生灵点" if Settings.language == "zh_CN" else "Plant Life"
 			radial.open_at(point, [
-				{"label": tr("Inspect"), "action": "inspect", "enabled": false},
-				{"label": label, "action": "plant", "enabled": true},
-				{"label": tr("Condense Life"), "action": "life", "enabled": false},
-				{"label": tr("Condense Ember"), "action": "ember", "enabled": false},
+				{"label": tr("Inspect"), "action": "inspect", "enabled": false, "icon": UITheme.icon("glossary")},
+				{"label": label, "action": "plant", "enabled": true, "icon": Art.item("life")},
+				{"label": tr("Condense Life"), "action": "life", "enabled": false, "icon": preload("res://assets/growth/life_stage1.svg")},
+				{"label": tr("Condense Ember"), "action": "ember", "enabled": false, "icon": Art.item("ember")},
 			], true)
 		return
 	if not Land.in_grid(cell): return
