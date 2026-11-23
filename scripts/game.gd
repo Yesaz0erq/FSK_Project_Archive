@@ -5,6 +5,12 @@ const BiomeViewScript := preload("res://scripts/world/biome_view.gd")
 const HudScript := preload("res://scripts/ui/hud.gd")
 const PauseScript := preload("res://scripts/ui/pause_menu.gd")
 const RadialScript := preload("res://scripts/ui/radial_menu.gd")
+const TutorialDirector := preload("res://scripts/tutorial/tutorial_director.gd")
+const TutorialOverlay := preload("res://scripts/tutorial/tutorial_overlay.gd")
+
+@export var tutorial_mode := false
+var tutorial: Node
+var tutorial_overlay: Control
 
 var hud: CanvasLayer
 var view: Node3D
@@ -19,7 +25,9 @@ var _context_cell := Vector2i(-1,-1)
 var _context_uid: int = -1
 
 func _ready() -> void:
-	if not Sim.running:
+	if tutorial_mode:
+		Sim.start_tutorial()
+	elif not Sim.running:
 		Sim.new_game(randi() % 1000000)
 	hud = HudScript.new()
 	add_child(hud)
@@ -31,10 +39,22 @@ func _ready() -> void:
 	radial = RadialScript.new()
 	context_layer.add_child(radial)
 	radial.chosen.connect(_context_action)
+	if tutorial_mode:
+		tutorial = TutorialDirector.new()
+		add_child(tutorial)
+		var guide_layer := CanvasLayer.new()
+		guide_layer.layer = 31
+		add_child(guide_layer)
+		tutorial_overlay = TutorialOverlay.new()
+		guide_layer.add_child(tutorial_overlay)
+		radial.dismissed.connect(tutorial.cancel_selection)
+		tutorial.finished.connect(_on_tutorial_finished)
+		hud.set_tutorial_guidance(true)
 	var pause_layer := CanvasLayer.new()
 	pause_layer.layer = 40
 	add_child(pause_layer)
 	pause_menu = PauseScript.new()
+	pause_menu.allow_save = not tutorial_mode
 	pause_layer.add_child(pause_menu)
 	pause_menu.return_to_title.connect(_to_menu)
 	var fl := CanvasLayer.new()
@@ -50,6 +70,25 @@ func _ready() -> void:
 	_load_biome(biome)
 	_arrival = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	_arrival.tween_property(_fade, "color:a", 0.0, 0.6)
+	if tutorial_mode:
+		view.set_growth_labels_visible(false)
+		tutorial_overlay.setup(view, radial)
+		# The last row finishes its staggered rise 1.36 seconds after scene entry.
+		_arrival.tween_interval(0.77)
+		_arrival.tween_callback(tutorial.start.bind(biome, tutorial_overlay))
+
+func _on_tutorial_finished() -> void:
+	view.set_growth_labels_visible(true)
+	hud.set_tutorial_guidance(false)
+
+func _guiding() -> bool:
+	return tutorial_mode and is_instance_valid(tutorial) and not tutorial.is_complete()
+
+func _exit_tree() -> void:
+	if tutorial_mode:
+		if is_instance_valid(tutorial): tutorial.stop()
+		Sim.running = false
+		Sim.tutorial_session = false
 
 func _load_biome(id: String) -> void:
 	if view != null:
@@ -65,7 +104,7 @@ func _load_biome(id: String) -> void:
 	hud.set_biome(id, view)
 
 func travel(id: String) -> void:
-	if _travelling: return
+	if _travelling or _guiding(): return
 	radial.cancel()
 	_travelling = true
 	if _arrival: _arrival.kill()
@@ -80,6 +119,10 @@ func travel(id: String) -> void:
 	_travelling = false
 
 func _on_clicked(cell: Vector2i, button: int) -> void:
+	if _guiding():
+		if button == MOUSE_BUTTON_LEFT and tutorial.is_armed() and Land.in_grid(cell) and not pause_menu.active:
+			tutorial.place_at(cell)
+		return
 	if button == MOUSE_BUTTON_RIGHT:
 		if hud.build_type != "": hud.select_build("")
 		else: view.select_cell(Vector2i(-1, -1))
@@ -90,7 +133,7 @@ func _on_clicked(cell: Vector2i, button: int) -> void:
 	hud._inspect_dirty = true
 
 func _process(delta: float) -> void:
-	if view == null or Settings.is_open() or radial.active or pause_menu.active: return
+	if view == null or Settings.is_open() or radial.active or pause_menu.active or _guiding(): return
 	var dir := Vector2.ZERO
 	if Input.is_key_pressed(KEY_A): dir.x -= 1
 	if Input.is_key_pressed(KEY_D): dir.x += 1
@@ -102,6 +145,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if Settings.is_open() or pause_menu.active: return
 	var k: InputEventKey = event
 	if not k.pressed or k.echo: return
+	if _guiding():
+		if k.keycode == KEY_ESCAPE:
+			if tutorial.is_armed(): tutorial.cancel_selection()
+			else: _open_pause()
+		get_viewport().set_input_as_handled()
+		return
 	match k.keycode:
 		KEY_ESCAPE: _open_pause()
 		KEY_Q: view.rotate_view(-1)
@@ -112,21 +161,36 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		KEY_F1, KEY_F2, KEY_F3, KEY_F4:
 			var i: int = k.keycode - KEY_F1
 			if i < Data.biome_order.size(): travel(Data.biome_order[i])
-		KEY_F5: Sim.save_game()
+		KEY_F5:
+			if not tutorial_mode: Sim.save_game()
 		KEY_F9:
-			if Sim.load_game(): travel(biome)
+			if not tutorial_mode and Sim.load_game(): travel(biome)
 		KEY_DELETE, KEY_X:
 			var m2: Dictionary = Sim.machine_at(biome, view.selected_cell)
 			if not m2.is_empty(): Sim.remove_machine(m2.uid)
 
 func _to_menu() -> void:
 	radial.cancel()
-	Sim.save_game()
+	if not tutorial_mode: Sim.save_game()
 	Sim.running = false
 	get_tree().change_scene_to_file("res://scenes/title.tscn")
 
 func _open_context(cell: Vector2i, point: Vector2) -> void:
-	if _travelling or Settings.is_open() or pause_menu.active or not Land.in_grid(cell): return
+	if _travelling or Settings.is_open() or pause_menu.active: return
+	if _guiding():
+		if tutorial.is_armed():
+			tutorial.cancel_selection()
+			return
+		if Land.in_grid(cell) and tutorial.open_menu(cell):
+			var label := "投放生灵点" if Settings.language == "zh_CN" else "Plant Life"
+			radial.open_at(point, [
+				{"label": tr("Inspect"), "action": "inspect", "enabled": false},
+				{"label": label, "action": "plant", "enabled": true},
+				{"label": tr("Condense Life"), "action": "life", "enabled": false},
+				{"label": tr("Condense Ember"), "action": "ember", "enabled": false},
+			], true)
+		return
+	if not Land.in_grid(cell): return
 	_context_cell = cell
 	var machine: Dictionary = Sim.machine_at(biome, cell)
 	_context_uid = int(machine.get("uid", -1))
@@ -149,6 +213,9 @@ func _open_context(cell: Vector2i, point: Vector2) -> void:
 	radial.open_at(point, entries)
 
 func _context_action(action: String) -> void:
+	if _guiding():
+		if action == "plant": tutorial.arm_life()
+		return
 	if not Land.in_grid(_context_cell): return
 	var machine: Dictionary = Sim.machine_at(biome, _context_cell)
 	if action in ["codex", "dismantle", "toggle"]:
@@ -172,4 +239,5 @@ func _context_action(action: String) -> void:
 
 func _open_pause() -> void:
 	radial.cancel()
+	if _guiding() and tutorial.is_armed(): tutorial.cancel_selection()
 	pause_menu.open()

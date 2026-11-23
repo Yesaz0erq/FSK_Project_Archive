@@ -3,6 +3,7 @@ signal return_to_title
 const ArchiveMark := preload("res://scripts/ui/archive_mark.gd")
 const RenderLayout := preload("res://scripts/world/machine_sprites.gd")
 var active: bool = false
+var allow_save := true
 var _was_paused: bool = false
 var _menu: PanelContainer
 var _codex: PanelContainer
@@ -49,7 +50,7 @@ func _ready() -> void:
 	_button(box,_caption("继续游戏", "Resume"),close)
 	_button(box,_caption("机器图鉴", "Machine Codex"),open_codex)
 	_button(box,_caption("设置", "Settings"),Settings.open)
-	_button(box,_caption("保存游戏", "Save Game"),func() -> void: Sim.save_game())
+	if allow_save: _button(box,_caption("保存游戏", "Save Game"),func() -> void: Sim.save_game())
 	_button(box,_caption("返回标题", "Return to Title"),func() -> void: close(); return_to_title.emit())
 	_codex = PanelContainer.new()
 	_codex.set_anchors_and_offsets_preset(Control.PRESET_CENTER)

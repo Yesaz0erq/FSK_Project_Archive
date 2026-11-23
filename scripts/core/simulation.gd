@@ -11,6 +11,7 @@ signal weather_changed(biome: String)
 signal toast(text: String, color: Color)
 
 const SAVE_PATH: String = "user://neo_currency_save.json"
+const TUTORIAL_SEED := 2026
 const START_MONEY: int = 400
 const ENERGY_CAP_BASE: float = 400.0
 
@@ -25,6 +26,7 @@ const GROWTH_PHASES := {
 }
 
 var running: bool = false
+var tutorial_session := false
 var paused: bool = false
 var time_scale: float = 1.0
 var game_time: float = 0.0
@@ -55,7 +57,11 @@ func _ready() -> void:
 	Land.riverbed_flooded.connect(_on_riverbed_flooded)
 
 # ================================================================ lifecycle
-func new_game(seed_in: int) -> void:
+func start_tutorial() -> void:
+	new_game(TUTORIAL_SEED, true)
+
+func new_game(seed_in: int, tutorial: bool = false) -> void:
+	tutorial_session = tutorial
 	seed_value = seed_in
 	eternity_records.clear()
 	life_growth.clear()
@@ -178,11 +184,11 @@ func add_life_point(biome: String, cell: Vector2i) -> String:
 	growth_changed.emit(biome)
 	return ""
 
-func _tick_life_growth(dt: float) -> void:
+func _tick_life_growth(dt: float, growth_holds: Dictionary = {}) -> void:
 	if dt < 0.0: return
 	for key: String in life_growth.keys():
 		var g: Dictionary = life_growth[key]
-		var budget := dt
+		var budget := maxf(0.0, dt - float(growth_holds.get(key, 0.0)))
 		while true:
 			var remaining: float = g.remaining
 			if remaining - budget > 0.000000001:
@@ -355,13 +361,13 @@ func _process(delta: float) -> void:
 	if not running or paused: return
 	step(delta * time_scale)
 
-func step(dt: float) -> void:
+func step(dt: float, growth_holds: Dictionary = {}) -> void:
 	game_time += dt
 	Land.tick(dt)
 	_tick_weather(dt)
 	_tick_orders(dt)
 	_tick_machines(dt)
-	_tick_life_growth(dt)
+	_tick_life_growth(dt, growth_holds)
 
 func _tick_orders(dt: float) -> void:
 	var changed: bool = false
@@ -481,6 +487,7 @@ func _credit_tide_output(m: Dictionary, item: String, quantity: int) -> void:
 
 # ================================================================ save / load
 func save_game(path: String = SAVE_PATH) -> bool:
+	if tutorial_session: return false
 	var ms: Array = []
 	for m: Dictionary in machines.values():
 		ms.append({"uid": m.uid, "type": m.type, "biome": m.biome, "cell": [m.cell.x, m.cell.y], "recipe": m.recipe,
@@ -505,6 +512,7 @@ static func has_save() -> bool:
 	return FileAccess.file_exists(SAVE_PATH)
 
 func load_game(path: String = SAVE_PATH) -> bool:
+	if tutorial_session: return false
 	if not FileAccess.file_exists(path): return false
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
 	if not parsed is Dictionary: return false

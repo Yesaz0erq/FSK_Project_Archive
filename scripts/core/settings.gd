@@ -39,7 +39,7 @@ func apply_display() -> void:
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED)
 
 func _process(delta: float) -> void:
-	if not Sim.running or is_open(): return
+	if not Sim.running or Sim.tutorial_session or is_open(): return
 	_elapsed += delta
 	if autosave_seconds > 0 and _elapsed >= autosave_seconds:
 		_elapsed = 0

@@ -78,6 +78,9 @@ func _ready() -> void:
 	start_button.icon = UITheme.icon("new", UITheme.BRASS)
 	start_button.add_theme_stylebox_override("normal", UITheme.box(Color("254848"), UITheme.JADE, 5, 1, 8))
 	actions.add_child(start_button)
+	var tutorial := _button(tr("Life Tutorial"), _start_tutorial)
+	tutorial.name = "LifeTutorial"
+	actions.add_child(tutorial)
 	var sh := HBoxContainer.new()
 	sh.add_child(UITheme.label(tr("World seed"), 14, UITheme.MUTED))
 	sh.custom_minimum_size.y = 40
@@ -131,6 +134,9 @@ func _new_game() -> void:
 	var s: int = int(_seed_edit.text) if _seed_edit.text.is_valid_int() else hash(_seed_edit.text)
 	Sim.new_game(absi(s))
 	get_tree().change_scene_to_file("res://scenes/game.tscn")
+
+func _start_tutorial() -> void:
+	get_tree().change_scene_to_file("res://scenes/tutorial.tscn")
 
 func _continue() -> void:
 	if Sim.load_game():

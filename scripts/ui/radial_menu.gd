@@ -1,9 +1,11 @@
 extends Control
 ## Four screen-space sectors; capture the release before any HUD control can consume it.
 signal chosen(action: String)
+signal dismissed
 const INNER: float = 38.0
 const OUTER: float = 140.0
 var active: bool = false
+var _click_to_choose := false
 var center := Vector2.ZERO
 var selected: int = -1
 var options: Array = []
@@ -37,8 +39,9 @@ func _ready() -> void:
 	hide()
 	set_process(false)
 
-func open_at(point: Vector2, entries: Array) -> void:
+func open_at(point: Vector2, entries: Array, click_to_choose := false) -> void:
 	options = entries
+	_click_to_choose = click_to_choose
 	var bounds: Vector2 = get_viewport_rect().size
 	center = point.clamp(Vector2.ONE * 150.0, bounds - Vector2.ONE * 150.0)
 	_pressed_at = point
@@ -58,6 +61,10 @@ func open_at(point: Vector2, entries: Array) -> void:
 
 func cancel() -> void:
 	if not active: return
+	_close()
+	dismissed.emit()
+
+func _close() -> void:
 	active = false
 	if _open_motion: _open_motion.kill()
 	set_process(false)
@@ -79,12 +86,21 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		_moved = _moved or event.position.distance_to(_pressed_at) > 8.0
 		_update_selection(event.position)
+	elif _click_to_choose and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		for i in options.size():
+			if bool(options[i].enabled) and Geometry2D.is_point_in_polygon(event.position, sector_polygon(i)):
+				_close()
+				chosen.emit(str(options[i].action))
+				break
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and not event.pressed:
 		_update_selection(event.position)
 		var action: String = ""
-		if _moved and selected >= 0 and bool(options[selected].enabled): action = str(options[selected].action)
-		cancel()
-		if action != "": chosen.emit(action)
+		if not _click_to_choose and _moved and selected >= 0 and bool(options[selected].enabled): action = str(options[selected].action)
+		if action.is_empty():
+			cancel()
+		else:
+			_close()
+			chosen.emit(action)
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		cancel()
 	get_viewport().set_input_as_handled()
@@ -101,10 +117,12 @@ func _layout_labels() -> void:
 	for i in range(4):
 		var direction := Vector2.from_angle(-PI * 0.5 + float(i) * PI * 0.5)
 		_labels[i].position = center + direction * 91.0 * _aperture - _labels[i].size * 0.5
+		_labels[i].visible = not _click_to_choose
 		_labels[i].text = str(options[i].label)
 		var enabled: bool = bool(options[i].enabled)
 		_labels[i].add_theme_color_override("font_color", UITheme.BRASS if enabled and selected == i else (UITheme.CREAM if enabled else Color("77777f")))
 	_center_label.position = center - _center_label.size * 0.5
+	_center_label.visible = not _click_to_choose
 	_center_label.text = tr("Cancel") if selected < 0 else (tr("Release") if bool(options[selected].enabled) else tr("Unavailable"))
 
 func _set_aperture(value: float) -> void:
@@ -121,22 +139,26 @@ func _process(delta: float) -> void:
 	queue_redraw()
 	set_process(moving)
 
+func sector_polygon(index: int) -> PackedVector2Array:
+	var angle := -PI * 0.5 + index * PI * 0.5
+	var first := angle - PI * 0.24
+	var last := angle + PI * 0.24
+	var radius := OUTER * _aperture + _weights[index] * 5.0
+	var points := PackedVector2Array()
+	for step in range(7):
+		points.append(center + Vector2.from_angle(lerpf(first,last,step/6.0)) * radius)
+	for step in range(6,-1,-1):
+		points.append(center + Vector2.from_angle(lerpf(first,last,step/6.0)) * INNER)
+	return points
+
 func _draw() -> void:
 	if not active: return
-	var ring := OUTER * _aperture
 	for i in range(4):
 		var angle := -PI * 0.5 + i * PI * 0.5
 		var enabled: bool = options[i].enabled
 		var weight := _weights[i]
-		var first := angle - PI * 0.24
-		var last := angle + PI * 0.24
-		var radius := ring + weight * 5.0
-		var points := PackedVector2Array()
-		# Seven facets per sector keep the aperture and highlighted rim visibly cut.
-		for step in range(7):
-			points.append(center + Vector2.from_angle(lerpf(first,last,step/6.0)) * radius)
-		for step in range(6,-1,-1):
-			points.append(center + Vector2.from_angle(lerpf(first,last,step/6.0)) * INNER)
+		var radius := OUTER * _aperture + weight * 5.0
+		var points := sector_polygon(i)
 		var ink := Color("142638f6") if enabled else Color("152030ed")
 		var lit := Color("285653") if enabled else Color("27313d")
 		draw_colored_polygon(points, ink.lerp(lit, weight))
@@ -146,5 +168,11 @@ func _draw() -> void:
 		draw_arc(center, radius - 5, angle - 0.16 - weight * 0.14, angle + 0.16 + weight * 0.14, 4, rim, 3.0)
 		var cursor := center + Vector2.from_angle(angle) * (INNER + 11)
 		draw_rect(Rect2(cursor.round() - Vector2(2,2), Vector2(4,4)), rim)
+		if _click_to_choose:
+			var icon: Texture2D = options[i].icon
+			var icon_center := center + Vector2.from_angle(angle) * 83.0 * _aperture
+			if enabled: icon_center.y -= 8.0
+			var size := Vector2(32,32)
+			draw_texture_rect(icon, Rect2(icon_center - size * .5, size), false, Color.WHITE if enabled else Color("97a7b7a6"))
 	draw_circle(center, INNER - 3, Color("0c1829ef"))
 	draw_arc(center, INNER - 4, 0.0, TAU, 12, UITheme.BORDER, 1.5)

@@ -68,6 +68,7 @@ var _effect_anchors: Array[Node3D] = []
 var _machine_root: Node3D
 var _machine_nodes: Dictionary = {}        # uid -> Dictionary of nodes
 var _growth_nodes: Dictionary = {}
+var _show_growth_labels := true
 var _growth_refresh_left := 0.0
 var _hover_frame: Node3D
 var _select_frame: Node3D
@@ -662,6 +663,11 @@ func _set_tile_model(tile: MeshInstance3D, id: String, cell: Vector2i) -> void:
 		tile.material_override = material
 		_tile_mats[cell] = material
 
+func set_growth_labels_visible(value: bool) -> void:
+	_show_growth_labels = value
+	for nodes: Dictionary in _growth_nodes.values():
+		nodes.label.visible = value
+
 func _refresh_growth_visuals() -> void:
 	if showcase: return
 	var alive: Dictionary = {}
@@ -676,6 +682,7 @@ func _refresh_growth_visuals() -> void:
 			root.position = cell_to_world(cell) + Vector3.UP * float(_prop_base_heights[cell])
 			_add_root_shadow(root, .52)
 			var label := _label("",Vector3(0,1.8,0),UITheme.CREAM,26)
+			label.visible = _show_growth_labels
 			label.font = UITheme.build().default_font
 			root.add_child(label)
 			_growth_nodes[key] = {"root":root, "model":null, "label":label, "stage":""}

@@ -14,6 +14,9 @@ var _tide_text: Label
 var _tide_bar_holder: Control
 var _clock: Label
 var _speed_buttons: Dictionary = {}
+var _tool_buttons: Dictionary = {}
+var _stats_panel: Control
+var _tools_panel: Control
 var _biome_buttons: Dictionary = {}
 var _inv_box: VBoxContainer
 var _inspect_box: VBoxContainer
@@ -83,6 +86,7 @@ func _panel(parent: Control) -> PanelContainer:
 
 func _build_top_bar() -> void:
 	var p := _panel(_root)
+	_stats_panel = p
 	p.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	p.offset_left = 16; p.offset_right = 16; p.offset_top = 12; p.offset_bottom = 82
 	var h := HBoxContainer.new()
@@ -152,6 +156,7 @@ func _build_top_bar() -> void:
 	_weather_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_weather_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	var tools_panel := _panel(_root)
+	_tools_panel = tools_panel
 	tools_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	tools_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	tools_panel.offset_left = -16
@@ -172,6 +177,17 @@ func _build_top_bar() -> void:
 		UITheme.button_motion(b)
 		b.pressed.connect(func() -> void: _top_action(action))
 		tools_row.add_child(b)
+		_tool_buttons[action] = b
+
+func set_tutorial_guidance(guided: bool) -> void:
+	# Keep the clock and menu accessible while the world-space prompts own planting.
+	for panel: Control in _root.get_children():
+		panel.visible = not guided or panel == _stats_panel or panel == _tools_panel
+	for button: Button in _speed_buttons.values():
+		button.disabled = guided
+	for action: String in _tool_buttons:
+		_tool_buttons[action].visible = action == "menu" or (not guided and action not in ["save", "load"])
+	_refresh_top()
 
 func _stat(parent: Control, caption: String, value: String, color: Color) -> Label:
 	var v := VBoxContainer.new()
