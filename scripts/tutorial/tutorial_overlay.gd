@@ -7,6 +7,7 @@ const HOTSPOT := Vector2(2, 1)
 const DARK := Color("#102534")
 const JADE := Color("#7ad9bd")
 const IVORY := Color("#fff3b9")
+const MOUSE_SIZE := Vector2(22, 31)
 const TOP_CORNERS := [
 	Vector3(-.766, .314, -.766), Vector3(.766, .314, -.766),
 	Vector3(.766, .314, .766), Vector3(-.766, .314, .766),
@@ -26,6 +27,7 @@ var _card: PanelContainer
 var _portrait: TextureRect
 var _title: Label
 var _description: Label
+var _card_click_hint: Control
 var _intro_cell := Vector2i(-1, -1)
 
 func _ready() -> void:
@@ -80,12 +82,17 @@ func _set_hint(kind: Hint) -> void:
 
 func _process(delta: float) -> void:
 	_age = fmod(_age + delta, 16.0)
-	if _hint == Hint.INTRO: _position_card()
+	if _hint == Hint.INTRO:
+		_position_card()
+		_card_click_hint.queue_redraw()
 	queue_redraw()
+
+func _pulse() -> float:
+	return .5 + .5 * cos(_age * TAU / 1.6)
 
 func _draw() -> void:
 	if not is_instance_valid(_view): return
-	var pulse := .5 + .5 * cos(_age * TAU / 1.6)
+	var pulse := _pulse()
 	match _hint:
 		Hint.TILES:
 			var centers := PackedVector2Array()
@@ -103,7 +110,7 @@ func _draw() -> void:
 				var tip := centers[i].round()
 				var left_side := centers.size() == 2 and tip.x < centers[1-i].x
 				_draw_pointer(tip, pulse)
-				_mouse(tip + (Vector2(-34, 3) if left_side else Vector2(29, 3)), Gesture.CLICK_LEFT if _left else Gesture.HOLD_RIGHT, pulse, counts[i], left_side)
+				_mouse(self, tip + (Vector2(-34, 3) if left_side else Vector2(29, 3)), Gesture.CLICK_LEFT if _left else Gesture.HOLD_RIGHT, pulse, counts[i], left_side)
 		Hint.SECTOR:
 			if not _radial.active: return
 			for i in _radial.options.size():
@@ -112,7 +119,7 @@ func _draw() -> void:
 				_outline(polygon, pulse)
 				var direction := Vector2.from_angle(-PI * .5 + i * PI * .5)
 				var radius: float = _radial.center.distance_to(polygon[3])
-				_mouse(_radial.center + direction * radius * .61 + Vector2(-11, 9), Gesture.RELEASE_RIGHT, pulse)
+				_mouse(self, _radial.center + direction * radius * .61 + Vector2(-11, 9), Gesture.RELEASE_RIGHT, pulse)
 				break
 		Hint.INTRO:
 			if not _view._tiles.has(_intro_cell): return
@@ -141,36 +148,36 @@ func _draw_pointer(tip: Vector2, pulse: float) -> void:
 	draw_texture(POINTER, origin)
 	_outline(outline, pulse)
 
-func _mouse(origin: Vector2, gesture: Gesture, pulse: float, count := "", count_on_left := false) -> void:
+func _mouse(canvas: CanvasItem, origin: Vector2, gesture: Gesture, pulse: float, count := "", count_on_left := false) -> void:
 	var at := origin.round()
 	var rgb := JADE.lerp(IVORY, pulse)
 	var shell := PackedVector2Array([Vector2(5,0),Vector2(17,0),Vector2(22,5),
 		Vector2(22,25),Vector2(17,31),Vector2(5,31),Vector2(0,25),Vector2(0,5)])
 	shell = Transform2D(0, at) * shell
-	draw_colored_polygon(shell, DARK)
+	canvas.draw_colored_polygon(shell, DARK)
 	var button := PackedVector2Array([Vector2(2,6),Vector2(6,2),Vector2(10,2),Vector2(10,14),Vector2(2,14)])
 	if gesture != Gesture.CLICK_LEFT:
 		for i in button.size(): button[i].x = 22.0 - button[i].x
 	var pressed := .86 if gesture == Gesture.HOLD_RIGHT else pulse
-	draw_colored_polygon(Transform2D(0, at) * button, JADE.darkened(.26).lerp(IVORY, pressed))
+	canvas.draw_colored_polygon(Transform2D(0, at) * button, JADE.darkened(.26).lerp(IVORY, pressed))
 	shell.append(shell[0])
-	draw_polyline(shell, rgb, 1.8, true)
-	draw_line(at+Vector2(11,2), at+Vector2(11,14), Color("#546b70"), 1.5)
-	draw_line(at+Vector2(2,15), at+Vector2(20,15), Color("#546b70"), 1.5)
+	canvas.draw_polyline(shell, rgb, 1.8, true)
+	canvas.draw_line(at+Vector2(11,2), at+Vector2(11,14), Color("#546b70"), 1.5)
+	canvas.draw_line(at+Vector2(2,15), at+Vector2(20,15), Color("#546b70"), 1.5)
 	if gesture == Gesture.HOLD_RIGHT:
-		draw_rect(Rect2(at+Vector2(5,22), Vector2(12,2)), Color("#39535b"))
-		draw_rect(Rect2(at+Vector2(5,22), Vector2(roundf(3+9*pulse),2)), rgb)
+		canvas.draw_rect(Rect2(at+Vector2(5,22), Vector2(12,2)), Color("#39535b"))
+		canvas.draw_rect(Rect2(at+Vector2(5,22), Vector2(roundf(3+9*pulse),2)), rgb)
 	elif gesture == Gesture.RELEASE_RIGHT:
 		var tip := at + Vector2(17, -3 - roundf(4 * (1.0 - pulse)))
 		var arrow := PackedVector2Array([tip + Vector2(-4, 4), tip, tip + Vector2(4, 4)])
-		draw_line(tip, tip + Vector2.DOWN * 11, DARK, 4.5, true)
-		draw_polyline(arrow, DARK, 4.5, true)
-		draw_line(tip, tip + Vector2.DOWN * 11, IVORY, 2, true)
-		draw_polyline(arrow, IVORY, 2, true)
+		canvas.draw_line(tip, tip + Vector2.DOWN * 11, DARK, 4.5, true)
+		canvas.draw_polyline(arrow, DARK, 4.5, true)
+		canvas.draw_line(tip, tip + Vector2.DOWN * 11, IVORY, 2, true)
+		canvas.draw_polyline(arrow, IVORY, 2, true)
 	if not count.is_empty():
 		var label_at := at + Vector2(-29 if count_on_left else 26, 23)
-		draw_string_outline(UITheme.sans, label_at, count, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, 5, DARK)
-		draw_string(UITheme.sans, label_at, count, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, IVORY)
+		canvas.draw_string_outline(UITheme.sans, label_at, count, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, 5, DARK)
+		canvas.draw_string(UITheme.sans, label_at, count, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, IVORY)
 
 func _build_card() -> void:
 	_card = PanelContainer.new()
@@ -194,15 +201,29 @@ func _build_card() -> void:
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	text.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_child(text)
+	var heading := HBoxContainer.new()
+	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	text.add_child(heading)
 	_title = UITheme.label("", 20, UITheme.BRASS, true)
 	_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	text.add_child(_title)
+	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	heading.add_child(_title)
+	_card_click_hint = Control.new()
+	_card_click_hint.name = "ClickLeftHint"
+	_card_click_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_card_click_hint.custom_minimum_size = MOUSE_SIZE + Vector2(4, 4)
+	_card_click_hint.draw.connect(_draw_card_click_hint)
+	heading.add_child(_card_click_hint)
 	_description = UITheme.label("", 15)
 	_description.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.add_child(_description)
 	_card.gui_input.connect(_on_card_input)
 	_card.hide()
+
+func _draw_card_click_hint() -> void:
+	_mouse(_card_click_hint, (_card_click_hint.size - MOUSE_SIZE) * .5, Gesture.CLICK_LEFT, _pulse())
 
 func _machine_anchor() -> Vector2:
 	var tile: MeshInstance3D = _view._tiles[_intro_cell]

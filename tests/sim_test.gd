@@ -113,8 +113,13 @@ func _ready() -> void:
 	var flooded := Vector2i(2, 7)
 	Land.restore_terrain({Land.parcel_key(BIOME, flooded): "sheet_riverbed"})
 	var on_riverbed := _machine("extractor", flooded)
+	var before_flood := Sim.count("life")
 	_full_tide()
 	check(not Sim.machines.has(on_riverbed.uid) and Land.get_parcel(BIOME, flooded).land == "sheet_river", "Flooded riverbed removes its machine")
+	Sim.remove_machine(on_riverbed.uid)
+	check(Sim.count("life") == before_flood, "A flooded machine grants no dismantling refund")
+	_check_dismantling()
+	_check_recorded_machine_refund()
 	_check_clock_boundaries()
 	print("FT1 TIDE CHECK: ", failures, " failures")
 	get_tree().quit(1 if failures > 0 else 0)
@@ -128,6 +133,51 @@ func _machine(id: String, cell: Vector2i) -> Dictionary:
 func _full_tide() -> void:
 	Land.start_tide()
 	Sim.step(Land.TIDE_ROW_SECONDS * Land.GRID + 0.01)
+
+func _check_dismantling() -> void:
+	Sim.new_game(2026)
+	var site := Vector2i(4, 4)
+	for machine_id: String in Data.machine_order:
+		var machine := _machine(machine_id, site)
+		var life := Sim.count("life")
+		Sim.remove_machine(machine.uid)
+		check(Sim.machine_at(BIOME, site).is_empty(), "Dismantling clears the machine site")
+		check(Sim.count("life") == life + 1, "Dismantling refunds exactly one Life for " + machine_id)
+		Sim.remove_machine(machine.uid)
+		check(Sim.count("life") == life + 1, "Repeating the command grants no additional Life")
+
+func _check_recorded_machine_refund() -> void:
+	Sim.new_game(2026)
+	var site := Vector2i(2, 7)
+	var key := Land.parcel_key(BIOME, site)
+	Land.energy_offsets[key] = {"eternity": 10.0}
+	Land.restore_terrain({key: "sheet_riverbed"})
+	_machine("collector", site)
+	Sim.record_eternity(BIOME, site)
+	var life := Sim.count("life")
+	_full_tide()
+	Sim.reshape_eternity(BIOME, site)
+	check(Sim.count("life") == life, "Restoring a flooded machine has no dismantling charge")
+	var rebuilt := Sim.machine_at(BIOME, site)
+	check(rebuilt.get("type") == "collector", "The recorded machine is rebuilt")
+	if rebuilt.is_empty(): return
+	Sim.remove_machine(rebuilt.uid)
+	check(Sim.count("life") == life + 1, "Dismantling the rebuilt machine refunds one Life")
+	var path := "user://ft1-dismantle-test-%s.json" % OS.get_process_id()
+	check(Sim.save_game(path) and Sim.load_game(path), "Save and reload the dismantled machine record")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	Sim.take_items({"life": life + 1})
+	Sim.reshape_eternity(BIOME, site)
+	check(Sim.machine_at(BIOME, site).is_empty() and Sim.count("life") == 0, "Restoration waits until the refund can be returned")
+	Sim.give_items({"life": 1})
+	for i in 2:
+		Sim.reshape_eternity(BIOME, site)
+		rebuilt = Sim.machine_at(BIOME, site)
+		check(rebuilt.get("type") == "collector" and Sim.count("life") == 0, "Restoring the dismantled machine takes back exactly one Life")
+		if rebuilt.is_empty(): return
+		Sim.reshape_eternity(BIOME, site)
+		Sim.remove_machine(Sim.machine_at(BIOME, site).uid)
+		check(Sim.count("life") == 1, "Reshaping and dismantling repeatedly cannot duplicate Life")
 
 func _check_clock_boundaries() -> void:
 	Sim.new_game(2026)

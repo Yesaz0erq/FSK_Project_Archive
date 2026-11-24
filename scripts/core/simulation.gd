@@ -278,11 +278,16 @@ func remove_machine(uid: int) -> void:
 	if not machines.has(uid): return
 	var m: Dictionary = machines[uid]
 	var def: Dictionary = Data.machines[m.type]
-	if m.started: give_items(recipe_of(m).get("inputs", {}))
+	machines.erase(uid)
+	var record: Dictionary = eternity_records.get(Land.parcel_key(m.biome, m.cell), {})
+	if int(record.get("machine", {}).get("uid", -1)) == uid:
+		record["dismantle_refunded"] = true
+	var refund: Dictionary = recipe_of(m).get("inputs", {}).duplicate() if m.started else {}
+	refund["life"] = int(refund.get("life", 0)) + 1
 	money += int(def.cost) / 2
 	Land.unbind_source("machine:%d" % uid)
-	machines.erase(uid)
-	toast.emit(tr("Dismantled %s (+¤%d)") % [def.name, int(def.cost) / 2], Color("d9c9a0"))
+	give_items(refund)
+	toast.emit(tr("Dismantled %s (+1 Life)") % def.name, Color("d9c9a0"))
 	stats_changed.emit()
 	machines_changed.emit(m.biome)
 
@@ -636,11 +641,17 @@ func reshape_eternity(biome: String, cell: Vector2i) -> void:
 	if not Data.machines.has(machine.get("type", "")): machine = {}
 	if not machine.is_empty() and (current.is_empty() or current.type != machine.type):
 		var def: Dictionary = Data.machines[machine.type]
-		if money < int(def.cost) or not has_items(def.get("materials", {})):
+		var materials: Dictionary = def.get("materials", {}).duplicate()
+		if saved.get("dismantle_refunded", false):
+			materials["life"] = int(materials.get("life", 0)) + 1
+			if count("life") < int(materials["life"]):
+				toast.emit(tr("Restoring this machine requires its refunded Life point"), UITheme.BAD)
+				return
+		if money < int(def.cost) or not has_items(materials):
 			toast.emit("重塑所需资金或组成材料不足", UITheme.BAD)
 			return
 		money -= int(def.cost)
-		take_items(def.get("materials", {}))
+		take_items(materials)
 	if not current.is_empty():
 		Land.unbind_source("machine:%d" % int(current.uid))
 		machines.erase(current.uid)
@@ -659,6 +670,8 @@ func reshape_eternity(biome: String, cell: Vector2i) -> void:
 		next_uid += 1
 		machine.cell = cell
 		machines[machine.uid] = machine
+		saved.machine.uid = machine.uid
+		saved.erase("dismantle_refunded")
 		_bind_aura(machine)
 	Land._invalidate(biome)
 	Land.tide_tile_transformed.emit(biome, cell, "", str(saved.land), 0)

@@ -591,6 +591,9 @@ func _refresh_inspector() -> void:
 		restore.text = "永恒：完整重塑"
 		restore.disabled = not Sim.eternity_records.has(Land.parcel_key(biome, c))
 		restore.tooltip_text = "恢复已记录的地块、附着物、能量与机械状态。缺失或不同的机械需支付建造资金与材料。"
+		var record: Dictionary = Sim.eternity_records.get(Land.parcel_key(biome, c), {})
+		if record.get("dismantle_refunded", false) and machine.get("type", "") != record.get("machine", {}).get("type", ""):
+			restore.tooltip_text += "\n" + tr("Restoring this machine requires its refunded Life point")
 		restore.pressed.connect(func() -> void: Sim.reshape_eternity(biome, c); _inspect_dirty = true)
 		_inspect_box.add_child(restore)
 	_section("自然能量与人工技术")

@@ -61,10 +61,12 @@ func _ready() -> void:
 	assert(not game.radial.active)
 	_release(Vector2.ZERO)
 	assert(Sim.machines.has(uid))
+	var life_before_dismantle := Sim.count("life")
 	_open()
 	_drag(Vector2.DOWN * 90)
 	_release(Vector2.DOWN * 90)
 	assert(not Sim.machines.has(uid))
+	assert(Sim.count("life") == life_before_dismantle + 1)
 	var ember := Sim.count("ember")
 	_open()
 	_drag(Vector2.LEFT * 180)
@@ -103,6 +105,15 @@ func _ready() -> void:
 	_drag(Vector2.RIGHT * 90)
 	_release(Vector2.RIGHT * 90)
 	assert(not game.radial.active)
+	Sim._tick_life_growth(15.0)
+	game.view.select_cell(OTHER)
+	var delete_key := InputEventKey.new()
+	delete_key.keycode = KEY_DELETE
+	delete_key.pressed = true
+	get_viewport().push_input(delete_key, true)
+	assert(Sim.machine_at("forest", OTHER).is_empty() and Sim.count("life") == 1)
+	get_viewport().push_input(delete_key, true)
+	assert(Sim.count("life") == 1)
 	print("RADIAL CHECK OK: board input, four sectors, release selection, two consecutive target plots, right cancel, disabled options")
 	get_tree().quit()
 

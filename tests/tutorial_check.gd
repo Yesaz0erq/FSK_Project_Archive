@@ -236,12 +236,17 @@ func _card(machine: String, cell: Vector2i) -> void:
 	_check(overlay._title.text == tr(str(Data.machines[machine].name)), "%s card title" % machine)
 	_check(overlay._description.text == tr(str(Data.machines[machine].description)), "%s card description" % machine)
 	_check(overlay._portrait.texture == Art.machine(machine), "%s card artwork" % machine)
+	await get_tree().process_frame
 	await _capture(machine + "-card")
 	var card: Control = overlay._card
+	var hint := card.find_child("ClickLeftHint", true, false) as Control
+	if not _check(is_instance_valid(hint) and hint.is_visible_in_tree(), "%s shows the left-click hint" % machine): return
+	_check(card.get_global_rect().encloses(hint.get_global_rect()), "%s keeps its hint inside the card" % machine)
+	_check(not hint.get_global_rect().intersects(overlay._description.get_global_rect()), "%s hint leaves the description clear" % machine)
 	var outside := Vector2(8, get_viewport().get_visible_rect().size.y - 8)
 	_click(outside)
 	_check(card.visible, "clicking outside leaves the %s card visible" % machine)
-	_click(card.get_global_rect().get_center())
+	_click(card.get_global_rect().get_center() if machine == "collector" else hint.get_global_rect().get_center())
 	_check(not card.visible, "click dismisses the %s card" % machine)
 
 func _capture(label: String) -> void:
