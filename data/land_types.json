@@ -411,7 +411,7 @@
         ],
         "attachment": "矮灌木",
         "presence": "生灵补正+1",
-        "departure": "返还一点生灵",
+        "departure": "/",
         "flip_to": "sheet_grass"
       },
       "environment": {

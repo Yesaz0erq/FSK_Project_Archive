@@ -2,10 +2,12 @@ extends Control
 ## Four screen-space sectors; capture the release before any HUD control can consume it.
 signal chosen(action: String)
 signal dismissed
+signal pause_time_requested
+var time_control_at: Callable
 const INNER: float = 38.0
 const OUTER: float = 140.0
 var active: bool = false
-var _click_to_choose := false
+var _icons_only := false
 var center := Vector2.ZERO
 var selected: int = -1
 var options: Array = []
@@ -13,6 +15,7 @@ var _labels: Array[Label] = []
 var _center_label: Label
 var _pressed_at := Vector2.ZERO
 var _moved: bool = false
+var _time_button_down := false
 var _open_motion: Tween
 var _dismiss_motion: Tween
 var _aperture := 1.0
@@ -39,13 +42,14 @@ func _ready() -> void:
 	hide()
 	set_process(false)
 
-func open_at(point: Vector2, entries: Array, click_to_choose := false) -> void:
+func open_at(point: Vector2, entries: Array, icons_only := false) -> void:
 	options = entries
-	_click_to_choose = click_to_choose
+	_icons_only = icons_only
 	var bounds: Vector2 = get_viewport_rect().size
 	center = point.clamp(Vector2.ONE * 150.0, bounds - Vector2.ONE * 150.0)
 	_pressed_at = point
 	_moved = false
+	_time_button_down = false
 	selected = -1
 	active = true
 	if _dismiss_motion: _dismiss_motion.kill()
@@ -76,36 +80,38 @@ func _close() -> void:
 	selected = -1
 
 func direction_at(point: Vector2) -> int:
-	var delta: Vector2 = point - center
-	if delta.length() < INNER or delta.length() > OUTER + 60.0: return -1
-	if absf(delta.x) > absf(delta.y): return 1 if delta.x > 0 else 3
-	return 2 if delta.y > 0 else 0
+	for i in options.size():
+		if Geometry2D.is_point_in_polygon(point, sector_polygon(i)): return i
+	return -1
 
 func _input(event: InputEvent) -> void:
 	if not active: return
+	var over_time_control := event is InputEventMouse and time_control_at.is_valid() and bool(time_control_at.call(event.position))
 	if event is InputEventMouseMotion:
-		_moved = _moved or event.position.distance_to(_pressed_at) > 8.0
 		_update_selection(event.position)
-	elif _click_to_choose and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		for i in options.size():
-			if bool(options[i].enabled) and Geometry2D.is_point_in_polygon(event.position, sector_polygon(i)):
-				_close()
-				chosen.emit(str(options[i].action))
-				break
+		if _time_button_down or over_time_control: return
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_time_button_down = over_time_control
+			if _time_button_down: return
+		elif _time_button_down:
+			_time_button_down = false
+			return
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and not event.pressed:
 		_update_selection(event.position)
-		var action: String = ""
-		if not _click_to_choose and _moved and selected >= 0 and bool(options[selected].enabled): action = str(options[selected].action)
-		if action.is_empty():
-			cancel()
-		else:
+		if selected >= 0 and bool(options[selected].enabled):
+			var action := str(options[selected].action)
 			_close()
 			chosen.emit(action)
-	elif event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
-		cancel()
+		else:
+			cancel()
+	elif event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE: cancel()
+		elif event.keycode == KEY_SPACE: pause_time_requested.emit()
 	get_viewport().set_input_as_handled()
 
 func _update_selection(point: Vector2) -> void:
+	_moved = _moved or point.distance_to(_pressed_at) > 8.0
 	var next := direction_at(point) if _moved else -1
 	if selected == next: return
 	selected = next
@@ -117,12 +123,12 @@ func _layout_labels() -> void:
 	for i in range(4):
 		var direction := Vector2.from_angle(-PI * 0.5 + float(i) * PI * 0.5)
 		_labels[i].position = center + direction * 91.0 * _aperture - _labels[i].size * 0.5
-		_labels[i].visible = not _click_to_choose
+		_labels[i].visible = not _icons_only
 		_labels[i].text = str(options[i].label)
 		var enabled: bool = bool(options[i].enabled)
 		_labels[i].add_theme_color_override("font_color", UITheme.BRASS if enabled and selected == i else (UITheme.CREAM if enabled else Color("77777f")))
 	_center_label.position = center - _center_label.size * 0.5
-	_center_label.visible = not _click_to_choose
+	_center_label.visible = not _icons_only
 	_center_label.text = tr("Cancel") if selected < 0 else (tr("Release") if bool(options[selected].enabled) else tr("Unavailable"))
 
 func _set_aperture(value: float) -> void:
@@ -168,7 +174,7 @@ func _draw() -> void:
 		draw_arc(center, radius - 5, angle - 0.16 - weight * 0.14, angle + 0.16 + weight * 0.14, 4, rim, 3.0)
 		var cursor := center + Vector2.from_angle(angle) * (INNER + 11)
 		draw_rect(Rect2(cursor.round() - Vector2(2,2), Vector2(4,4)), rim)
-		if _click_to_choose:
+		if _icons_only:
 			var icon: Variant = options[i].get("icon")
 			if not icon is Texture2D: continue
 			var icon_center := center + Vector2.from_angle(angle) * 83.0 * _aperture

@@ -12,6 +12,7 @@ extends Node
 signal tide_tile_changed(biome: String, cell: Vector2i, old_land: String, new_land: String, edge: int)
 signal tide_tile_transformed(biome: String, cell: Vector2i, old_land: String, new_land: String, edge: int)
 signal tide_started(edge: int)
+signal tide_tiles_settled
 signal tide_finished
 signal riverbed_flooded(biome: String, cell: Vector2i)
 signal parcels_changed(biome: String)
@@ -29,7 +30,7 @@ var energy_offsets: Dictionary = {}
 var tide_state: Dictionary = {}
 var tide_elapsed: float = 0.0
 var tide_count: int = 0
-const TIDE_ROW_SECONDS: float = 0.7
+const TIDE_ROW_SECONDS: float = 0.5
 var _base: Dictionary = {}       # biome -> Array[Dictionary] (index = y * GRID + x)
 var bindings: Array = []         # Array[Dictionary]
 var _next_binding: int = 1
@@ -223,8 +224,30 @@ func unbind_source(source_id: String) -> void:
 			bindings.remove_at(i)
 	for biome: String in touched: _invalidate(biome)
 
-func tick(delta: float) -> void:
-	_tick_tide(delta)
+## Waves use real seconds. Advance gameplay only in the gaps between waves.
+func tick(delta: float, rate: float = 1.0, advance_world: Callable = Callable()) -> void:
+	var remaining := delta
+	while remaining > 0.0:
+		if not tide_state.is_empty():
+			remaining = _advance_wave(remaining)
+			continue
+		if rate <= 0.0: return
+		var world_seconds := remaining * rate
+		var starts_wave := false
+		if Settings.tide_seconds > 0.0:
+			var until_wave := maxf(0.0, Settings.tide_seconds - tide_elapsed)
+			if world_seconds + 0.000000001 >= until_wave:
+				world_seconds = until_wave
+				starts_wave = true
+			tide_elapsed += world_seconds
+		if world_seconds > 0.0:
+			_tick_bindings(world_seconds)
+			if advance_world.is_valid(): advance_world.call(world_seconds)
+		if not starts_wave: return
+		remaining = maxf(0.0, remaining - world_seconds / rate)
+		start_tide()
+
+func _tick_bindings(delta: float) -> void:
 	var expired: Array = []
 	for b: Dictionary in bindings:
 		if float(b.remaining) >= 0.0:
@@ -339,7 +362,6 @@ func clear_attachment(biome: String, cell: Vector2i) -> void:
 	var attachment: String = str(p.sheet.get("attachment", "/"))
 	if attachment == "/": return
 	cleared[parcel_key(biome, cell)] = true
-	if attachment == "矮灌木": Sim.give_items({"life": 1})
 	_invalidate(biome)
 
 func life_cost(biome: String, cell: Vector2i) -> int:
@@ -360,37 +382,36 @@ func start_tide() -> void:
 	var edge: int = rng.randi_range(0, 3)
 	tide_state = {"edge": edge, "row": 0, "elapsed": 0.0, "flow": 1 if tide_count % 2 == 1 else -1}
 	tide_started.emit(edge)
+	_apply_wave_row()
 
-func _tick_tide(delta: float) -> void:
+func _advance_wave(delta: float) -> float:
 	var remaining := delta
-	while remaining > 0.0:
-		if tide_state.is_empty():
-			if Settings.tide_seconds <= 0.0: return
-			var until_tide := maxf(0.0, Settings.tide_seconds - tide_elapsed)
-			if remaining < until_tide:
-				tide_elapsed += remaining
-				return
-			remaining -= until_tide
-			start_tide()
+	# Pre-v4 saves can still be waiting to start the first row.
+	if int(tide_state.row) == 0: _apply_wave_row()
+	while not tide_state.is_empty():
 		var until_row := maxf(0.0, TIDE_ROW_SECONDS - float(tide_state.elapsed))
 		if remaining + 0.000000001 < until_row:
 			tide_state.elapsed = float(tide_state.elapsed) + remaining
-			tide_elapsed += remaining
-			return
+			return 0.0
 		remaining = maxf(0.0, remaining - until_row)
-		tide_elapsed += until_row
 		tide_state.elapsed = 0.0
-		var row: int = int(tide_state.row)
-		var edge: int = int(tide_state.edge)
-		for b: String in Data.biome_order:
-			for i in range(GRID):
-				var cell := Vector2i(row if edge == 0 else GRID - 1 - row, i) if edge < 2 else Vector2i(i, row if edge == 2 else GRID - 1 - row)
-				_tide_replace(b, cell, edge)
-		tide_state.row = row + 1
 		if int(tide_state.row) >= GRID:
 			tide_state.clear()
-			_water_oasis_neighbors(edge)
+			tide_tiles_settled.emit()
 			tide_finished.emit()
+			break
+		_apply_wave_row()
+	return remaining
+
+func _apply_wave_row() -> void:
+	var row := int(tide_state.row)
+	var edge := int(tide_state.edge)
+	for biome: String in Data.biome_order:
+		for i in range(GRID):
+			var cell := Vector2i(row if edge == 0 else GRID - 1 - row, i) if edge < 2 else Vector2i(i, row if edge == 2 else GRID - 1 - row)
+			_tide_replace(biome, cell, edge)
+	tide_state.row = row + 1
+	if int(tide_state.row) == GRID: _water_oasis_neighbors(edge)
 
 # Resolve oasis conversions after the last row so their outcome is identical
 # for eastbound and westbound tides.

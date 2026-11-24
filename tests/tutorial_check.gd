@@ -10,6 +10,7 @@ var output_dir := ""
 func _ready() -> void:
 	get_window().size = Vector2i(1600, 960)
 	Settings.autosave_seconds = 0
+	Settings.tide_seconds = 30.0
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--output-dir=") and DisplayServer.get_name() != "headless":
 			output_dir = arg.trim_prefix("--output-dir=")
@@ -31,6 +32,8 @@ func _run() -> void:
 	var spare := _other_visible_cell()
 	var start_life := Sim.count("life")
 	var stage = director.Stage
+	_check(not Sim.is_processing(), "the director is the sole clock owner during guidance")
+	_check_clock_controls()
 
 	_click(_point(first))
 	_button(MOUSE_BUTTON_RIGHT, true, _point(spare))
@@ -44,21 +47,23 @@ func _run() -> void:
 		await _check_optional_icons()
 	await _capture("02-wheel")
 	_click(game.radial.center + Vector2.UP * 85)
-	_check(not director.is_armed(), "disabled sector cannot arm Life")
-	_move(game.radial.center + Vector2.RIGHT * 85)
-	_button(MOUSE_BUTTON_RIGHT, false, game.radial.center + Vector2.RIGHT * 85)
-	_check(not game.radial.active and not director.is_armed(), "right release alone cancels the wheel")
+	_button(MOUSE_BUTTON_RIGHT, false, game.radial.center + Vector2.UP * 85)
+	_check(not game.radial.active and not director.is_armed(), "releasing over a disabled sector cancels the wheel")
 	_arm(first)
-	_check(overlay._left and overlay._count == "X1", "first placement shows left click X1")
+	_check(overlay._left and overlay._counts.get(first) == "X1", "first placement shows left click X1")
 	await _capture("03-placement")
 	_click(_point(spare))
 	_check(director.stage == stage.FIRST and Sim.count("life") == start_life, "invalid terrain cannot advance or spend a point")
 	_check(Sim.growth_at(game.biome, spare).is_empty(), "invalid terrain stays empty")
-	if not director.is_armed(): _arm(first)
+	_check(director.is_armed(), "an invalid placement keeps Life selected")
+	_wait_through_first_tide()
+	first = director.hints[0]
 	var alternate: Vector2i = director._eligible.filter(func(cell: Vector2i) -> bool: return cell != first)[0]
 	_click(_point(alternate))
 	first = alternate
 	if not _check(director.stage == stage.PAIRS and director.hints.size() == 2, "first Life reveals the two branch parcels"): return
+	_check(director.is_armed(), "the tool remains selected after the first placement")
+	_check_scripted_pause()
 	_check(Sim.count("life") == start_life - 1, "first parcel costs one Life")
 	var pair: Array = director.hints.duplicate()
 	_check(pair[0] != pair[1] and not pair.has(first), "guide uses three distinct parcels")
@@ -67,14 +72,24 @@ func _run() -> void:
 	# Exercise either-order support by beginning with the second highlighted parcel.
 	for cell: Vector2i in [pair[1], pair[0]]:
 		for click in 2:
-			if not director.is_armed(): _arm(cell)
+			_check(director.is_armed(), "Life stays selected between allowed placements")
 			if cell == pair[1] and click == 0:
-				_check(overlay._left and overlay._count == "X2", "paired placement shows left click X2")
+				_check(overlay._left and overlay._counts.get(cell) == "X2", "paired placement shows left click X2")
 				await _capture("05-pair-placement")
 			_click(_point(cell))
+			if cell == pair[1] and click == 0:
+				_check(overlay._counts.get(cell) == "X1", "the marker counts down for the partially planted parcel")
+				_button(MOUSE_BUTTON_RIGHT, true, _point(cell))
+				_button(MOUSE_BUTTON_RIGHT, false, _point(cell))
+				_check(not director.is_armed() and not game.radial.active, "a second right press cancels the tool")
+				_click(_point(cell))
+				_check(Sim.growth_at(game.biome, cell).get("stage") == "phase1", "cancelled tool cannot place")
+				_arm(cell)
 		_check(Sim.growth_at(game.biome, cell).get("stage") == "phase2_2", "two points choose branch 2-2")
 	if not _check(director.stage == stage.WAIT_PROPAGATOR, "both two-point plots enter the first wait"): return
 	_check(Sim.count("life") == start_life - 5, "two points spent per paired parcel")
+	_check(not Sim.paused and Sim.time_scale == 1.0, "scripted pause releases at 1x")
+	_check_clock_controls()
 	if not _advance_to(stage.PROPAGATOR_CARD): return
 	await _card("propagator", first)
 	if not _check(director.stage == stage.THIRD and director.hints.size() == 1, "propagator card reveals third-point target"): return
@@ -83,8 +98,8 @@ func _run() -> void:
 	var collector: Vector2i = pair[0] if pair[1] == last else pair[1]
 	_check(pair.has(last), "third point targets a two-point parcel")
 	await _capture("06-third-parcel")
-	if not director.is_armed(): _arm(last)
-	_check(overlay._left and overlay._count == "X1", "third placement shows left click X1")
+	_check(director.is_armed(), "selection survives the time wait and introduction")
+	_check(overlay._left and overlay._counts.get(highlighted) == "X1", "third placement shows left click X1")
 	_click(_point(last))
 	_check(Sim.growth_at(game.biome, last).get("stage") == "phase3_2", "third point chooses branch 3-2")
 	if not _check(director.stage == stage.WAIT_COLLECTOR, "third point starts collector wait"): return
@@ -95,6 +110,7 @@ func _run() -> void:
 	if not _advance_to(stage.EXTRACTOR_CARD): return
 	await _card("extractor", last)
 	_check(director.stage == stage.COMPLETE and director.is_complete(), "last card completes the guide")
+	_check(Sim.is_processing() and not Sim.paused and Sim.time_scale == 1.0, "free play takes over the clock once at 1x")
 	_check(Sim.machines.size() == 3, "all three field machines exist")
 	_check(not overlay._card.visible and game.view._show_growth_labels, "free-play presentation restored")
 	if not failed:
@@ -118,6 +134,23 @@ func _check_optional_icons() -> void:
 	await RenderingServer.frame_post_draw
 	game.radial.options = saved
 	game.radial.queue_redraw()
+
+func _wait_through_first_tide() -> void:
+	var previous: Array = director._eligible.duplicate()
+	var wave := Land.tide_count
+	var before := Sim.count("life")
+	_click(game.hud._speed_buttons[3.0].get_global_rect().get_center())
+	var time_to_wave := (Settings.tide_seconds - Land.tide_elapsed) / 3.0
+	director._process(time_to_wave + Land.GRID * Land.TIDE_ROW_SECONDS + .01)
+	_check(Land.tide_count == wave + 1 and Land.tide_state.is_empty(), "the first instruction can wait through an automatic tide at 3x")
+	_check(director.is_armed() and not director.hints.is_empty(), "tide refresh preserves the selected Life tool")
+	_check(Land.get_parcel(game.biome, director.hints[0]).land == "sheet_grass", "first instruction still highlights current grass after the tide")
+	for cell: Vector2i in previous:
+		if Land.get_parcel(game.biome, cell).land == "sheet_grass": continue
+		_click(_point(cell))
+		_check(director.stage == director.Stage.FIRST and Sim.count("life") == before, "grass converted to sand no longer accepts the first point")
+		return
+	_check(false, "the test tide converted at least one old grass target")
 
 func _other_visible_cell() -> Vector2i:
 	for cell: Vector2i in game.view._tiles:
@@ -160,9 +193,33 @@ func _open(cell: Vector2i) -> void:
 func _arm(cell: Vector2i) -> void:
 	_open(cell)
 	var sector: Vector2 = game.radial.center + Vector2.RIGHT * 85
+	_move(sector)
 	_click(sector)
+	_check(game.radial.active and not director.is_armed(), "a left click cannot select the open wheel sector")
 	_button(MOUSE_BUTTON_RIGHT, false, sector)
-	_check(director.is_armed() and not game.radial.active, "left sector selection arms a placement through right release")
+	_check(director.is_armed() and not game.radial.active, "right release selects the pointed Life sector")
+
+func _check_clock_controls() -> void:
+	var speed_buttons: Dictionary = game.hud._speed_buttons
+	for button: Button in speed_buttons.values():
+		_check(not button.disabled, "all clock controls work during the first step and growth waits")
+	var before := Sim.game_time
+	_click(speed_buttons[3.0].get_global_rect().get_center())
+	director._process(.25)
+	_check(Sim.time_scale == 3.0 and is_equal_approx(Sim.game_time, before + .75), "3x advances the world clock by three simulated seconds per second")
+	_click(speed_buttons[0.0].get_global_rect().get_center())
+	before = Sim.game_time
+	director._process(1.0)
+	_check(Sim.paused and Sim.game_time == before, "pause freezes the clock during guidance")
+	_click(speed_buttons[1.0].get_global_rect().get_center())
+	_check(not Sim.paused and Sim.time_scale == 1.0, "1x resumes guided time")
+
+func _check_scripted_pause() -> void:
+	var before := Sim.game_time
+	for button: Button in game.hud._speed_buttons.values():
+		_check(button.disabled, "clock controls lock for scripted pauses")
+	director._process(1.0)
+	_check(Sim.paused and Sim.game_time == before, "a scripted pause freezes simulation")
 
 func _advance_to(target: int) -> bool:
 	for step in 100:
@@ -172,7 +229,10 @@ func _advance_to(target: int) -> bool:
 
 func _card(machine: String, cell: Vector2i) -> void:
 	if not _check(overlay._card.visible and overlay._intro_cell == cell, "%s card attached to its plot" % machine): return
+	_check_scripted_pause()
 	_check(Sim.machine_at(game.biome, cell).get("type") == machine, "%s exists when introduced" % machine)
+	var expected_count: int = ["propagator", "collector", "extractor"].find(machine) + 1
+	_check(Sim.machines.size() == expected_count and Sim.machine_at(game.biome, cell).uid == expected_count, "%s is newly grown and later machines are still seedlings" % machine)
 	_check(overlay._title.text == tr(str(Data.machines[machine].name)), "%s card title" % machine)
 	_check(overlay._description.text == tr(str(Data.machines[machine].description)), "%s card description" % machine)
 	_check(overlay._portrait.texture == Art.machine(machine), "%s card artwork" % machine)

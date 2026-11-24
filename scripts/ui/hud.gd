@@ -3,6 +3,7 @@ extends CanvasLayer
 
 signal travel_requested(biome: String)
 signal menu_requested
+signal life_placement_requested(cell: Vector2i)
 
 var view: Node3D                       # current BiomeView (set by game.gd)
 var biome: String = "forest"
@@ -14,6 +15,8 @@ var _tide_text: Label
 var _tide_bar_holder: Control
 var _clock: Label
 var _speed_buttons: Dictionary = {}
+var _tutorial_time_locked := false
+var _last_wave_row := -1
 var _tool_buttons: Dictionary = {}
 var _stats_panel: Control
 var _tools_panel: Control
@@ -183,11 +186,21 @@ func set_tutorial_guidance(guided: bool) -> void:
 	# Keep the clock and menu accessible while the world-space prompts own planting.
 	for panel: Control in _root.get_children():
 		panel.visible = not guided or panel == _stats_panel or panel == _tools_panel
-	for button: Button in _speed_buttons.values():
-		button.disabled = guided
 	for action: String in _tool_buttons:
 		_tool_buttons[action].visible = action == "menu" or (not guided and action not in ["save", "load"])
 	_refresh_top()
+
+func set_tutorial_time_locked(locked: bool) -> void:
+	_tutorial_time_locked = locked
+	for button: Button in _speed_buttons.values():
+		button.disabled = locked
+	_refresh_top()
+
+func time_control_at(point: Vector2) -> bool:
+	for button: Button in _speed_buttons.values():
+		if button.is_visible_in_tree() and not button.disabled and button.get_global_rect().has_point(point):
+			return true
+	return false
 
 func _stat(parent: Control, caption: String, value: String, color: Color) -> Label:
 	var v := VBoxContainer.new()
@@ -291,7 +304,8 @@ func _fit_details() -> void:
 	_detail_motion.tween_property(_tabs, "size:y", height, 0.25)
 
 func _build_bottom() -> void:
-	_hint = UITheme.label("右键拖向投放生灵点 · 5 秒内可加第 2 点，随后 10 秒内可加第 3 点 · Esc 查看图鉴" if Settings.language == "zh_CN" else "Hold right-click to plant Life · Add a second within 5s and a third within the next 10s · Esc for codex", 14, UITheme.MUTED)
+	_hint = UITheme.label("", 14, UITheme.MUTED)
+	set_life_armed(false)
 	_hint.add_theme_stylebox_override("normal", UITheme.box(Color("101b2cf2"), UITheme.BORDER, 3, 1, 4))
 	_hint.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	_hint.offset_left = -360
@@ -301,6 +315,13 @@ func _build_bottom() -> void:
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_hint)
+
+func set_life_armed(armed: bool) -> void:
+	var zh := Settings.language == "zh_CN"
+	if armed:
+		_hint.text = "已选中生灵点 · 左键连续投放 · 右键取消" if zh else "Life selected · Left-click plots to plant · Right-click to cancel"
+	else:
+		_hint.text = "按住右键打开轮盘 · 在生灵点分区松开即可选取" if zh else "Hold right-click to open the wheel · Release over Life to select it"
 
 func _build_toasts() -> void:
 	_toast_box = VBoxContainer.new()
@@ -453,6 +474,10 @@ func _refresh_inventory() -> void:
 
 func _process(delta: float) -> void:
 	if not Sim.running: return
+	var row := int(Land.tide_state.get("row", -1))
+	if row != _last_wave_row:
+		_last_wave_row = row
+		_refresh_top()
 	var t: int = int(Sim.game_time)
 	if _last_clock_second != t:
 		_last_clock_second = t
@@ -518,7 +543,7 @@ func _refresh_inspector() -> void:
 			plant.text = ("投放 1 点生灵" if zh else "Plant 1 Life") if growth.is_empty() else ("追加 1 点生灵" if zh else "Add 1 Life")
 			plant.tooltip_text = Sim.can_add_life(biome, c)
 			plant.disabled = plant.tooltip_text != ""
-			plant.pressed.connect(func() -> void: Sim.add_life_point(biome, c); _inspect_dirty = true)
+			plant.pressed.connect(func() -> void: life_placement_requested.emit(c))
 			_inspect_box.add_child(plant)
 	var temp_def: Dictionary = Data.temperatures[p.temperature]
 	var tl := UITheme.label("%s · %s" % [temp_def.name, Data.biome_name(biome)], 14, Color(str(temp_def.color)))
@@ -551,15 +576,12 @@ func _refresh_inspector() -> void:
 				clear_button.pressed.connect(func() -> void: Land.clear_attachment(biome, c); _inspect_dirty = true)
 				_inspect_box.add_child(clear_button)
 
-	var energy_actions := HBoxContainer.new()
-	for kind: String in ["life", "ember"]:
-		var button := Button.new()
-		button.text = "凝聚" + str(Data.elements[kind].name)
-		button.tooltip_text = "消耗地块的 20 点自然能量，获得 1 点库存能量。"
-		button.disabled = float(p.elements[kind]) < 20
-		button.pressed.connect(func() -> void: Sim.condense(biome, c, kind); _inspect_dirty = true)
-		energy_actions.add_child(button)
-	_inspect_box.add_child(energy_actions)
+	var condense := Button.new()
+	condense.text = tr("Condense Ember")
+	condense.tooltip_text = "消耗地块的 20 点余烬，获得 1 点库存余烬。" if zh else "Spend 20 Ember from this plot to gain 1 Ember."
+	condense.disabled = float(p.elements.ember) < 20
+	condense.pressed.connect(func() -> void: Sim.condense(biome, c, "ember"); _inspect_dirty = true)
+	_inspect_box.add_child(condense)
 	if float(p.elements.eternity) > 0:
 		var archive := Button.new()
 		archive.text = "永恒：记录组成"
@@ -770,6 +792,7 @@ func cycle_view_mode() -> void:
 	set_view_mode(VIEW_MODES[(cur + 1) % VIEW_MODES.size()][0])
 
 func _set_speed(sp: float) -> void:
+	if _tutorial_time_locked: return
 	if sp == 0.0: Sim.paused = not Sim.paused
 	else:
 		Sim.paused = false

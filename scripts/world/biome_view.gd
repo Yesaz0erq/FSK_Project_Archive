@@ -109,6 +109,7 @@ func setup(biome_id: String, is_showcase: bool = false) -> void:
 	Land.parcels_changed.connect(_on_parcels_changed)
 	Land.tide_tile_changed.connect(_on_tide_tile)
 	Land.tide_tile_transformed.connect(_on_tide_transform)
+	Land.tide_tiles_settled.connect(_settle_wave_view)
 	Sim.machines_changed.connect(_on_machines_changed)
 	Sim.machine_cycled.connect(_on_machine_cycled)
 	Sim.growth_changed.connect(func(b: String) -> void: if b == biome: _growth_refresh_left = 0.0)
@@ -564,15 +565,16 @@ func _process(delta: float) -> void:
 		if _growth_refresh_left <= 0.0:
 			_refresh_growth_visuals()
 			_growth_refresh_left = 0.1
+	var in_wave := not Land.tide_state.is_empty()
 	for tween: Tween in _tide_tweens.values():
-		tween.set_speed_scale(0.0 if Sim.paused else Sim.time_scale)
+		tween.set_speed_scale(0.0 if Sim.paused else (1.0 if in_wave else Sim.time_scale))
 	_t += delta
 	if showcase: _yaw_target += delta * 0.6
 	_yaw = lerpf(_yaw, _yaw_target, 1.0 - exp(-delta * 7.0))
 	_zoom = lerpf(_zoom, _zoom_target, 1.0 - exp(-delta * 9.0))
 	_camera_pan = _camera_pan.lerp(_pan, 1.0 - exp(-delta * 20.0))
 	_apply_camera()
-	var sim_speed := 1.0 if showcase else (0.0 if Sim.paused else Sim.time_scale)
+	var sim_speed := 1.0 if showcase else (0.0 if Sim.paused or in_wave else Sim.time_scale)
 	if _ghost.visible: _position_ghost()
 	for marker: Node3D in _aura_preview.get_children():
 		_place_frame(marker, marker.get_meta("cell"))
@@ -607,16 +609,24 @@ func _begin_tide_motion(cell: Vector2i, new_id: String) -> Tween:
 	_tile_heights[cell] = float(Data.land_types[new_id].get("height", 0.0))
 	_moving_cells[cell] = true
 	var tween := create_tween()
-	tween.set_speed_scale(0.0 if Sim.paused else Sim.time_scale)
+	tween.set_speed_scale(0.0 if Sim.paused else (1.0 if not Land.tide_state.is_empty() else Sim.time_scale))
 	_tide_tweens[cell] = tween
+	scenery.land.refresh_boundary(cell)
 	return tween
+
+func _settle_wave_view() -> void:
+	if showcase: return
+	# A single slow frame can advance several rows before the renderer runs.
+	for tween: Tween in _tide_tweens.values():
+		tween.set_speed_scale(1.0)
+		tween.custom_step(1.0)
+	scenery.land.settle_wave()
 
 func _finish_tide_motion(cell: Vector2i) -> void:
 	var tile: MeshInstance3D = _tiles[cell]
 	tile.material_overlay = null
 	tile.rotation = Vector3.ZERO
 	_tide_tweens.erase(cell)
-	scenery.land.refresh_boundary(cell)
 	_moving_cells[cell] = true
 	_queue_recolor()
 
@@ -637,9 +647,9 @@ func _on_tide_tile(b: String, cell: Vector2i, old_id: String, next_id: String, e
 		var angle := smoothstep(0.0, 1.0, t) * PI
 		tile.position.y = lerpf(start_y, rest_y, t) + 0.93 * sin(t * PI)
 		tile.rotation = axis * (angle if t < 0.5 else angle - PI)
-	tween.tween_method(animate, 0.0, 0.5, 0.30)
+	tween.tween_method(animate, 0.0, 0.5, Land.TIDE_ROW_SECONDS * 0.43)
 	tween.tween_callback(_set_tile_model.bind(tile, next_id, cell))
-	tween.tween_method(animate, 0.5, 1.0, 0.30)
+	tween.tween_method(animate, 0.5, 1.0, Land.TIDE_ROW_SECONDS * 0.43)
 	tween.tween_callback(_finish_tide_motion.bind(cell))
 
 func _set_tile_model(tile: MeshInstance3D, id: String, cell: Vector2i) -> void:
@@ -736,7 +746,7 @@ func _on_tide_transform(b: String, cell: Vector2i, old_id: String, new_id: Strin
 	var sweep := func(progress: float) -> void:
 		crest.set_shader_parameter("progress", progress)
 		tile.position.y = lerpf(start_y, end_y, smoothstep(0.0, 1.0, progress)) + float(_selection_lifts.get(cell, 0.0))
-	tween.tween_method(sweep, 0.0, 0.5, 0.27)
+	tween.tween_method(sweep, 0.0, 0.5, Land.TIDE_ROW_SECONDS * 0.39)
 	tween.tween_callback(_set_tile_model.bind(tile, new_id, cell))
-	tween.tween_method(sweep, 0.5, 1.0, 0.27)
+	tween.tween_method(sweep, 0.5, 1.0, Land.TIDE_ROW_SECONDS * 0.39)
 	tween.tween_callback(_finish_tide_motion.bind(cell))

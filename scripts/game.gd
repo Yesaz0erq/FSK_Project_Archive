@@ -23,6 +23,8 @@ var pause_menu: Control
 var radial: Control
 var _context_cell := Vector2i(-1,-1)
 var _context_uid: int = -1
+var _life_armed := false
+var _consume_right_release := false
 
 func _ready() -> void:
 	if tutorial_mode:
@@ -33,12 +35,15 @@ func _ready() -> void:
 	add_child(hud)
 	hud.travel_requested.connect(travel)
 	hud.menu_requested.connect(_open_pause)
+	hud.life_placement_requested.connect(_place_life)
 	var context_layer := CanvasLayer.new()
 	context_layer.layer = 30
 	add_child(context_layer)
 	radial = RadialScript.new()
+	radial.time_control_at = hud.time_control_at
 	context_layer.add_child(radial)
 	radial.chosen.connect(_context_action)
+	radial.pause_time_requested.connect(hud._set_speed.bind(0.0))
 	if tutorial_mode:
 		tutorial = TutorialDirector.new()
 		add_child(tutorial)
@@ -80,6 +85,7 @@ func _ready() -> void:
 func _on_tutorial_finished() -> void:
 	view.set_growth_labels_visible(true)
 	hud.set_tutorial_guidance(false)
+	_set_life_armed(tutorial.is_armed())
 
 func _guiding() -> bool:
 	return tutorial_mode and is_instance_valid(tutorial) and not tutorial.is_complete()
@@ -119,18 +125,45 @@ func travel(id: String) -> void:
 	_travelling = false
 
 func _on_clicked(cell: Vector2i, button: int) -> void:
+	if button != MOUSE_BUTTON_LEFT or not Land.in_grid(cell) or pause_menu.active: return
 	if _guiding():
-		if button == MOUSE_BUTTON_LEFT and tutorial.is_armed() and Land.in_grid(cell) and not pause_menu.active:
-			tutorial.place_at(cell)
+		if tutorial.is_armed(): tutorial.place_at(cell)
 		return
-	if button == MOUSE_BUTTON_RIGHT:
-		if hud.build_type != "": hud.select_build("")
-		else: view.select_cell(Vector2i(-1, -1))
+	if _life_armed:
+		_place_life(cell)
 		return
-	if not Land.in_grid(cell): return
-	if pause_menu.active: return
 	view.select_cell(cell if view.selected_cell != cell else Vector2i(-1, -1))
 	hud._inspect_dirty = true
+
+func _place_life(cell: Vector2i) -> void:
+	var reason := Sim.add_life_point(biome, cell)
+	if reason != "":
+		hud.show_toast(reason, UITheme.BAD)
+		return
+	_set_life_armed(true)
+	hud._inspect_dirty = true
+
+func _set_life_armed(armed: bool) -> void:
+	_life_armed = armed
+	hud.set_life_armed(armed)
+
+func _input(event: InputEvent) -> void:
+	if not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_RIGHT: return
+	if not event.pressed:
+		if _consume_right_release:
+			_consume_right_release = false
+			get_viewport().set_input_as_handled()
+		return
+	_consume_right_release = false
+	if Settings.is_open() or pause_menu.active: return
+	if _guiding() and tutorial.is_armed():
+		tutorial.cancel_selection()
+	elif _life_armed:
+		_set_life_armed(false)
+	else:
+		return
+	_consume_right_release = true
+	get_viewport().set_input_as_handled()
 
 func _process(delta: float) -> void:
 	if view == null or Settings.is_open() or radial.active or pause_menu.active or _guiding(): return
@@ -146,9 +179,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	var k: InputEventKey = event
 	if not k.pressed or k.echo: return
 	if _guiding():
-		if k.keycode == KEY_ESCAPE:
-			if tutorial.is_armed(): tutorial.cancel_selection()
-			else: _open_pause()
+		if k.keycode == KEY_ESCAPE: _open_pause()
+		if k.keycode == KEY_SPACE: hud._set_speed(0.0)
 		get_viewport().set_input_as_handled()
 		return
 	match k.keycode:
@@ -178,15 +210,12 @@ func _to_menu() -> void:
 func _open_context(cell: Vector2i, point: Vector2) -> void:
 	if _travelling or Settings.is_open() or pause_menu.active: return
 	if _guiding():
-		if tutorial.is_armed():
-			tutorial.cancel_selection()
-			return
 		if Land.in_grid(cell) and tutorial.open_menu(cell):
 			var label := "投放生灵点" if Settings.language == "zh_CN" else "Plant Life"
 			radial.open_at(point, [
 				{"label": tr("Inspect"), "action": "inspect", "enabled": false, "icon": UITheme.icon("glossary")},
 				{"label": label, "action": "plant", "enabled": true, "icon": Art.item("life")},
-				{"label": tr("Condense Life"), "action": "life", "enabled": false, "icon": preload("res://assets/growth/life_stage1.svg")},
+				{"label": tr("Clear attachment"), "action": "clear", "enabled": false, "icon": UITheme.icon("forest")},
 				{"label": tr("Condense Ember"), "action": "ember", "enabled": false, "icon": Art.item("ember")},
 			], true)
 		return
@@ -205,10 +234,10 @@ func _open_context(cell: Vector2i, point: Vector2) -> void:
 		entries.append({"label": tr("Pause") if machine.enabled else tr("Resume"), "action": "toggle", "enabled": true})
 	else:
 		var parcel: Dictionary = Land.get_parcel(biome, cell)
-		var planting := Sim.growth_at(biome, cell).is_empty()
-		var label := ("投放生灵点" if planting else "追加生灵点") if Settings.language == "zh_CN" else ("Plant Life" if planting else "Add Life")
-		entries.append({"label": label, "action": "plant", "enabled": Sim.can_add_life(biome, cell) == ""})
-		entries.append({"label": tr("Condense Life"), "action": "life", "enabled": float(parcel.elements.life) >= 20.0})
+		var label := "投放生灵点" if Settings.language == "zh_CN" else "Plant Life"
+		entries.append({"label": label, "action": "plant", "enabled": Sim.count("life") > 0})
+		var has_attachment := str(parcel.sheet.get("attachment", "/")) != "/" and not bool(parcel.attachment_cleared)
+		entries.append({"label": tr("Clear attachment"), "action": "clear", "enabled": has_attachment})
 		entries.append({"label": tr("Condense Ember"), "action": "ember", "enabled": float(parcel.elements.ember) >= 20.0})
 	radial.open_at(point, entries)
 
@@ -230,14 +259,11 @@ func _context_action(action: String) -> void:
 			pause_menu._show_machine(machine.type)
 		"dismantle": Sim.remove_machine(_context_uid)
 		"toggle": Sim.toggle_enabled(_context_uid)
-		"plant":
-			var reason: String = Sim.add_life_point(biome,_context_cell)
-			if reason != "": hud.show_toast(reason,UITheme.BAD)
+		"plant": _set_life_armed(true)
 		"clear": Land.clear_attachment(biome, _context_cell)
-		"life", "ember": Sim.condense(biome, _context_cell, action)
+		"ember": Sim.condense(biome, _context_cell, action)
 	hud._inspect_dirty = true
 
 func _open_pause() -> void:
 	radial.cancel()
-	if _guiding() and tutorial.is_armed(): tutorial.cancel_selection()
 	pause_menu.open()

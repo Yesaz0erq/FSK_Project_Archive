@@ -15,9 +15,9 @@ func _ready() -> void:
 		assert(Data.land_types[old].sheet.flip_to == next)
 		flips += 1)
 	Land.start_tide()
-	for i in range(11): Land.tick(0.71)
+	for i in Land.GRID: Land.tick(Land.TIDE_ROW_SECONDS)
 	assert(flips > 0)
-	assert(Sim.count("life") >= life)
+	assert(Sim.count("life") == life)
 	var old_rule: String = Data.land_types.sheet_sand.sheet.tide
 	Data.land_types.sheet_sand.sheet.tide = "转变"
 	Land._base.forest[cell.y*11+cell.x].land = "sheet_sand"

@@ -14,6 +14,8 @@ const SAVE_PATH: String = "user://neo_currency_save.json"
 const TUTORIAL_SEED := 2026
 const START_MONEY: int = 400
 const ENERGY_CAP_BASE: float = 400.0
+const SELF_CYCLE_SECONDS := 15.0
+const TIME_EPSILON := 0.000000001
 
 # The two decision windows expire into their default branch. A manual addition
 # branches immediately and starts the full timer for the next phase.
@@ -81,6 +83,7 @@ func new_game(seed_in: int, tutorial: bool = false) -> void:
 		weather_timer[b] = _rng.randf_range(50.0, 110.0)
 	delivered = 0
 	game_time = 0.0
+	_rate_time = 0.0
 	paused = false
 	time_scale = 1.0
 	_fill_orders()
@@ -263,7 +266,7 @@ func place_machine(machine_id: String, biome: String, cell: Vector2i) -> String:
 
 func _make_machine(machine_id: String, biome: String, cell: Vector2i, uid: int) -> Dictionary:
 	return {"uid": uid, "type": machine_id, "biome": biome, "cell": cell, "recipe": 0,
-		"progress": 0.0, "started": false, "wear": 0.0, "jammed": false, "enabled": true,
+		"progress": 0.0, "cycle_elapsed": 0.0, "started": false, "wear": 0.0, "jammed": false, "enabled": true,
 		"status": tr("Idle"), "carry": {}, "cycles": 0}
 
 func _bind_aura(m: Dictionary) -> void:
@@ -359,15 +362,30 @@ func _fill_orders() -> void:
 # ================================================================ tick
 func _process(delta: float) -> void:
 	if not running or paused: return
-	step(delta * time_scale)
+	step(delta, {}, time_scale)
 
-func step(dt: float, growth_holds: Dictionary = {}) -> void:
-	game_time += dt
-	Land.tick(dt)
-	_tick_weather(dt)
-	_tick_orders(dt)
-	_tick_machines(dt)
-	_tick_life_growth(dt, growth_holds)
+func step(delta: float, growth_holds: Dictionary = {}, rate: float = 1.0) -> void:
+	Land.tick(delta, rate, _advance_world.bind(growth_holds.duplicate()))
+
+func _advance_world(dt: float, growth_holds: Dictionary) -> void:
+	# Slice at maturities and production pulses so large steps behave like frames.
+	var remaining := dt
+	while remaining > 0.0:
+		var interval := remaining
+		for key: String in life_growth:
+			var phase_left := float(life_growth[key].remaining) + float(growth_holds.get(key, 0.0))
+			if phase_left > TIME_EPSILON: interval = minf(interval, phase_left)
+		for m: Dictionary in machines.values():
+			if m.enabled and Data.machines[m.type].supply == "self":
+				interval = minf(interval, maxf(TIME_EPSILON, SELF_CYCLE_SECONDS - float(m.get("cycle_elapsed", 0.0))))
+		game_time += interval
+		_tick_orders(interval)
+		_tick_weather(interval)
+		_tick_machines(interval)
+		_tick_life_growth(interval, growth_holds)
+		for key: String in growth_holds:
+			growth_holds[key] = maxf(0.0, float(growth_holds[key]) - interval)
+		remaining = maxf(0.0, remaining - interval)
 
 func _tick_orders(dt: float) -> void:
 	var changed: bool = false
@@ -428,58 +446,65 @@ func _has_working_plot(biome: String, neighbors: Array[Vector2i]) -> bool:
 	return false
 
 func _tick_machines(dt: float) -> void:
-	var wave_active := not Land.tide_state.is_empty()
+	var due: Dictionary = {"propagator": [], "collector": []}
 	for m: Dictionary in machines.values():
-		var neighbors := Land.machine_neighbors(m.cell, Data.machines[m.type].area)
 		if not m.enabled:
 			m.status = tr("Paused")
-		elif not _has_working_plot(m.biome, neighbors):
-			m.status = tr("No plot in range has nonnegative Life concentration")
+			continue
+		var def: Dictionary = Data.machines[m.type]
+		if def.supply == "self":
+			m.cycle_elapsed = float(m.get("cycle_elapsed", 0.0)) + dt
+			if float(m.cycle_elapsed) + TIME_EPSILON >= SELF_CYCLE_SECONDS:
+				m.cycle_elapsed = maxf(0.0, float(m.cycle_elapsed) - SELF_CYCLE_SECONDS)
+				due[m.type].append(m.uid)
+			m.progress = float(m.cycle_elapsed) / SELF_CYCLE_SECONDS
+			m.status = tr("Working")
 		else:
-			m.status = tr("Working") if wave_active else tr("Waiting for tide")
-		m.progress = (float(Land.tide_state.get("row", 0)) / Land.GRID) if wave_active and m.enabled else 0.0
+			m.status = tr("Waiting for tide")
+		if not _has_working_plot(m.biome, Land.machine_neighbors(m.cell, def.area)):
+			m.status = tr("No plot in range has nonnegative Life concentration")
+	# Simultaneous collectors see the concentration after seeding.
+	for type: String in ["propagator", "collector"]:
+		due[type].sort()
+		for uid: int in due[type]: _activate_machine(machines[uid])
 	_rate_time += dt
 	if _rate_time >= 1.0:
-		_rate_time = 0.0
+		_rate_time = fmod(_rate_time, 1.0)
 		stats_changed.emit()
 
 func _on_tide_finished() -> void:
-	# Resolve all seeding before reading the collectors' totals. Extractors
-	# sharing plots draw in UID order, including after restoring a save.
+	# Extractors sharing plots draw in UID order, including after restoring a save.
 	var ids: Array = machines.keys()
 	ids.sort()
-	var changed: Dictionary = {}
-	for type: String in ["propagator", "collector", "extractor"]:
-		var def: Dictionary = Data.machines[type]
-		for uid: int in ids:
-			var m: Dictionary = machines[uid]
-			if m.type != type: continue
-			m.last_output = {}
-			if not m.enabled: continue
-			var neighbors := Land.machine_neighbors(m.cell, def.area)
-			if not _has_working_plot(m.biome, neighbors): continue
-			match type:
-				"propagator":
-					for cell in neighbors: Land.seed_plot(m.biome, cell)
-					m.cycles = int(m.cycles) + neighbors.size()
-				"collector":
-					var concentration := 0
-					for cell in neighbors:
-						concentration += int(Land.get_parcel(m.biome, cell).life_concentration)
-					_credit_tide_output(m, "life", floori(maxi(0, concentration) / 8.0))
-				"extractor":
-					var extracted := int(m.carry.get("concentration", 0))
-					for cell in neighbors:
-						if int(Land.get_parcel(m.biome, cell).life_concentration) > 0:
-							Land.change_concentration(m.biome, cell, -1)
-							extracted += 1
-					m.carry.concentration = extracted % 8
-					_credit_tide_output(m, "liquid_energy_canister", floori(extracted / 8.0))
-			changed[m.biome] = true
-			machine_cycled.emit(uid)
-	for biome: String in changed: machines_changed.emit(biome)
+	for uid: int in ids:
+		var m: Dictionary = machines[uid]
+		if m.enabled and Data.machines[m.type].supply == "tide": _activate_machine(m)
 
-func _credit_tide_output(m: Dictionary, item: String, quantity: int) -> void:
+func _activate_machine(m: Dictionary) -> void:
+	m.last_output = {}
+	var neighbors := Land.machine_neighbors(m.cell, Data.machines[m.type].area)
+	if not _has_working_plot(m.biome, neighbors): return
+	match str(m.type):
+		"propagator":
+			for cell in neighbors: Land.seed_plot(m.biome, cell)
+			m.cycles = int(m.cycles) + neighbors.size()
+		"collector":
+			var concentration := 0
+			for cell in neighbors:
+				concentration += int(Land.get_parcel(m.biome, cell).life_concentration)
+			_credit_output(m, "life", floori(maxi(0, concentration) / 8.0))
+		"extractor":
+			var extracted := int(m.carry.get("concentration", 0))
+			for cell in neighbors:
+				if int(Land.get_parcel(m.biome, cell).life_concentration) > 0:
+					Land.change_concentration(m.biome, cell, -1)
+					extracted += 1
+			m.carry.concentration = extracted % 8
+			_credit_output(m, "liquid_energy_canister", floori(extracted / 8.0))
+	machine_cycled.emit(m.uid)
+	machines_changed.emit(m.biome)
+
+func _credit_output(m: Dictionary, item: String, quantity: int) -> void:
 	if quantity <= 0: return
 	m.cycles = int(m.cycles) + quantity
 	m.last_output = {item: quantity}
@@ -492,8 +517,8 @@ func save_game(path: String = SAVE_PATH) -> bool:
 	for m: Dictionary in machines.values():
 		ms.append({"uid": m.uid, "type": m.type, "biome": m.biome, "cell": [m.cell.x, m.cell.y], "recipe": m.recipe,
 			"progress": m.progress, "started": m.started, "wear": m.wear, "jammed": m.jammed, "enabled": m.enabled,
-			"carry": m.carry, "cycles": m.cycles, "last_output": m.get("last_output", {})})
-	var data: Dictionary = {"version": 3, "seed": seed_value, "terrain_generator": Land.generation_version,
+			"carry": m.carry, "cycles": m.cycles, "cycle_elapsed": m.get("cycle_elapsed", 0.0), "last_output": m.get("last_output", {})})
+	var data: Dictionary = {"version": 4, "seed": seed_value, "terrain_generator": Land.generation_version,
 		"time": game_time, "money": money, "reputation": reputation,
 		"life_growth": life_growth, "inventory": inventory, "energy": energy, "machines": ms, "next_uid": next_uid, "orders": orders,
 		"weather": weather, "weather_timer": weather_timer, "weather_bindings": Land.save_bindings(), "delivered": delivered,
@@ -527,12 +552,18 @@ func load_game(path: String = SAVE_PATH) -> bool:
 	Land.restore_terrain(d.get("terrain_overrides", {}))
 	Land.tide_state = d.get("tide_state", {})
 	Land.tide_elapsed = float(d.get("tide_elapsed", 0.0))
+	if not Land.tide_state.is_empty():
+		Land.tide_elapsed = 0.0
+		if int(d.get("version", 1)) < 4:
+			# Old waves allotted 0.7 seconds to each row.
+			Land.tide_state.elapsed = Land.TIDE_ROW_SECONDS * clampf(float(Land.tide_state.elapsed) / 0.7, 0.0, 1.0)
 	Land.tide_count = int(d.get("tide_count", 0))
 	Land.cleared = d.get("cleared_attachments", {})
 	Land._cache.clear()
 	_rng.seed = hash("sim|%d" % seed_value)
 	if d.has("rng_state"): _rng.state = int(str(d.rng_state))
 	game_time = float(d.get("time", 0.0))
+	_rate_time = 0.0
 	money = int(d.get("money", START_MONEY))
 	reputation = int(d.get("reputation", 0))
 	inventory = {}
@@ -553,6 +584,8 @@ func load_game(path: String = SAVE_PATH) -> bool:
 		for k: String in ["recipe", "progress", "started", "wear", "jammed", "enabled", "carry", "cycles", "last_output"]:
 			if raw.has(k): m[k] = raw[k]
 		m.recipe = int(m.recipe)
+		m.cycle_elapsed = clampf(float(raw.get("cycle_elapsed", 0.0)), 0.0, SELF_CYCLE_SECONDS)
+		if Data.machines[m.type].supply == "self": m.progress = m.cycle_elapsed / SELF_CYCLE_SECONDS
 		machines[m.uid] = m
 		_bind_aura(m)
 	orders.clear()
@@ -573,7 +606,7 @@ func load_game(path: String = SAVE_PATH) -> bool:
 	return true
 
 func condense(biome: String, cell: Vector2i, kind: String) -> void:
-	if kind not in ["life", "ember"]: return
+	if kind != "ember": return
 	var parcel: Dictionary = Land.get_parcel(biome, cell)
 	if float(parcel.elements[kind]) < 20.0: return
 	var key: String = Land.parcel_key(biome, cell)

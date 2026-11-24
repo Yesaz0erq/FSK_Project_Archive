@@ -13,10 +13,11 @@ const TOP_CORNERS := [
 ]
 
 enum Hint { NONE, TILES, SECTOR, INTRO }
+enum Gesture { HOLD_RIGHT, RELEASE_RIGHT, CLICK_LEFT }
 var _hint := Hint.NONE
 var _cells: Array = []
 var _left := false
-var _count := ""
+var _counts := {}
 var _age := 0.0
 var _cursor_outline := PackedVector2Array()
 var _view: Node3D
@@ -49,14 +50,13 @@ func _exit_tree() -> void:
 	if DisplayServer.get_name() != "headless":
 		Input.set_custom_mouse_cursor(null, Input.CURSOR_ARROW)
 
-func show_tiles(cells: Array, left_click: bool, count_text := "") -> void:
+func show_tiles(cells: Array, left_click: bool, counts: Dictionary) -> void:
 	_cells = cells.duplicate()
 	_left = left_click
-	_count = count_text
+	_counts = counts
 	_set_hint(Hint.TILES)
 
-func show_sector(count_text := "") -> void:
-	_count = count_text
+func show_sector() -> void:
 	_set_hint(Hint.SECTOR)
 
 func show_intro(cell: Vector2i, machine_id: String) -> void:
@@ -89,6 +89,7 @@ func _draw() -> void:
 	match _hint:
 		Hint.TILES:
 			var centers := PackedVector2Array()
+			var counts := PackedStringArray()
 			for cell: Vector2i in _cells:
 				var tile: MeshInstance3D = _view._tiles.get(cell)
 				if not is_instance_valid(tile): continue
@@ -97,11 +98,12 @@ func _draw() -> void:
 					contour.append(_project(tile.to_global(corner)))
 				_outline(contour, pulse)
 				centers.append((contour[0] + contour[2]) * .5)
+				counts.append(_counts.get(cell, ""))
 			for i in centers.size():
 				var tip := centers[i].round()
 				var left_side := centers.size() == 2 and tip.x < centers[1-i].x
 				_draw_pointer(tip, pulse)
-				_mouse(tip + (Vector2(-34, 3) if left_side else Vector2(29, 3)), _left, pulse, left_side)
+				_mouse(tip + (Vector2(-34, 3) if left_side else Vector2(29, 3)), Gesture.CLICK_LEFT if _left else Gesture.HOLD_RIGHT, pulse, counts[i], left_side)
 		Hint.SECTOR:
 			if not _radial.active: return
 			for i in _radial.options.size():
@@ -110,7 +112,7 @@ func _draw() -> void:
 				_outline(polygon, pulse)
 				var direction := Vector2.from_angle(-PI * .5 + i * PI * .5)
 				var radius: float = _radial.center.distance_to(polygon[3])
-				_mouse(_radial.center + direction * radius * .61 + Vector2(-11, 9), true, pulse, false)
+				_mouse(_radial.center + direction * radius * .61 + Vector2(-11, 9), Gesture.RELEASE_RIGHT, pulse)
 				break
 		Hint.INTRO:
 			if not _view._tiles.has(_intro_cell): return
@@ -139,31 +141,36 @@ func _draw_pointer(tip: Vector2, pulse: float) -> void:
 	draw_texture(POINTER, origin)
 	_outline(outline, pulse)
 
-func _mouse(origin: Vector2, left: bool, pulse: float, count_on_left: bool) -> void:
+func _mouse(origin: Vector2, gesture: Gesture, pulse: float, count := "", count_on_left := false) -> void:
 	var at := origin.round()
 	var rgb := JADE.lerp(IVORY, pulse)
-	# Keep the same mouse silhouette for the two gestures. The held button
-	# stays lit as its meter grows; the clicked button releases between taps.
 	var shell := PackedVector2Array([Vector2(5,0),Vector2(17,0),Vector2(22,5),
 		Vector2(22,25),Vector2(17,31),Vector2(5,31),Vector2(0,25),Vector2(0,5)])
 	shell = Transform2D(0, at) * shell
 	draw_colored_polygon(shell, DARK)
 	var button := PackedVector2Array([Vector2(2,6),Vector2(6,2),Vector2(10,2),Vector2(10,14),Vector2(2,14)])
-	if not left:
+	if gesture != Gesture.CLICK_LEFT:
 		for i in button.size(): button[i].x = 22.0 - button[i].x
-	var pressed := pulse if left else .86
+	var pressed := .86 if gesture == Gesture.HOLD_RIGHT else pulse
 	draw_colored_polygon(Transform2D(0, at) * button, JADE.darkened(.26).lerp(IVORY, pressed))
 	shell.append(shell[0])
 	draw_polyline(shell, rgb, 1.8, true)
 	draw_line(at+Vector2(11,2), at+Vector2(11,14), Color("#546b70"), 1.5)
 	draw_line(at+Vector2(2,15), at+Vector2(20,15), Color("#546b70"), 1.5)
-	if not left:
+	if gesture == Gesture.HOLD_RIGHT:
 		draw_rect(Rect2(at+Vector2(5,22), Vector2(12,2)), Color("#39535b"))
 		draw_rect(Rect2(at+Vector2(5,22), Vector2(roundf(3+9*pulse),2)), rgb)
-	if not _count.is_empty():
+	elif gesture == Gesture.RELEASE_RIGHT:
+		var tip := at + Vector2(17, -3 - roundf(4 * (1.0 - pulse)))
+		var arrow := PackedVector2Array([tip + Vector2(-4, 4), tip, tip + Vector2(4, 4)])
+		draw_line(tip, tip + Vector2.DOWN * 11, DARK, 4.5, true)
+		draw_polyline(arrow, DARK, 4.5, true)
+		draw_line(tip, tip + Vector2.DOWN * 11, IVORY, 2, true)
+		draw_polyline(arrow, IVORY, 2, true)
+	if not count.is_empty():
 		var label_at := at + Vector2(-29 if count_on_left else 26, 23)
-		draw_string_outline(UITheme.sans, label_at, _count, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, 5, DARK)
-		draw_string(UITheme.sans, label_at, _count, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, IVORY)
+		draw_string_outline(UITheme.sans, label_at, count, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, 5, DARK)
+		draw_string(UITheme.sans, label_at, count, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, IVORY)
 
 func _build_card() -> void:
 	_card = PanelContainer.new()

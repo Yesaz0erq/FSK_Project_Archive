@@ -48,7 +48,12 @@ func _missing_machine(portrait: bool) -> Texture2D:
 	return _cache[key]
 
 func item(id: String) -> Texture2D:
-	return _load("res://assets/items/%s.svg" % id, 1.0, "res://assets/items/_fallback.svg")
+	var path := "res://assets/items/%s.svg" % id
+	if _cache.has(path): return _cache[path]
+	if not id.is_valid_identifier() or not ResourceLoader.exists(path):
+		path = "res://assets/items/_fallback.svg"
+	_cache[path] = load(path) as Texture2D
+	return _cache[path]
 
 func svg(path: String, scale: float = 1.0) -> Texture2D:
 	return _load(path, scale, "")

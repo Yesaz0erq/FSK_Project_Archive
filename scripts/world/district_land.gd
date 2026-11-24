@@ -8,7 +8,7 @@ const GroundShader := preload("res://assets/shaders/district_ground.gdshader")
 const TILE := 1.6
 const EDGE := 8.8
 const COLLAR := 12.0
-const TIDE_BLEND_SECONDS := 0.39
+const TIDE_BLEND_SECONDS := Land.TIDE_ROW_SECONDS * 0.56
 const LAST := 10
 const IDS := ["sheet_sand", "sheet_grass", "sheet_burnt", "sheet_river", "sheet_riverbed", "sheet_oasis", "sheet_river_low"]
 const DELTAS := [Vector2i(0, 0), Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1)]
@@ -168,7 +168,7 @@ func _update_levels(initial := false) -> void:
 
 func _process(delta: float) -> void:
 	if Sim.paused: return
-	_level_time += delta * Sim.time_scale
+	_level_time += delta * (Sim.time_scale if Land.tide_state.is_empty() else 1.0)
 	var t := smoothstep(0.0,TIDE_BLEND_SECONDS,_level_time)
 	for i in _levels.size():
 		_levels[i] = lerpf(_level_from[i],_level_target[i],t)
@@ -295,10 +295,15 @@ func refresh_boundary(cell: Vector2i) -> void:
 		_rebuild_margin.call_deferred()
 
 func _rebuild_margin() -> void:
+	if not _refresh_pending: return
 	_refresh_pending = false
 	_update_levels()
 	_lip.mesh = _build_surface(true)
 	margin_rebuilt.emit()
+
+func settle_wave() -> void:
+	if _refresh_pending: _rebuild_margin()
+	if is_processing(): _update_levels(true)
 
 func _build_surface(margin: bool) -> ArrayMesh:
 	var st := SurfaceTool.new()

@@ -1,19 +1,36 @@
 extends Node
 var events: int = 0
 var last_row: int = -1
+var extractor_saw_settled_board := false
 func _ready() -> void:
 	Sim.new_game(2026)
 	Sim.paused = true
 	var game: Node = load("res://scenes/game.tscn").instantiate()
 	add_child(game)
 	Land.tide_tile_changed.connect(_changed)
+	# A machine callback must see the completed board even if several rows
+	# advance between rendered frames.
+	var site := Vector2i(5, 5)
+	Land.restore_terrain({Land.parcel_key("forest", site): "sheet_grass"})
+	var extractor := Sim._make_machine("extractor", "forest", site, Sim.next_uid)
+	Sim.next_uid += 1
+	Sim.machines[extractor.uid] = extractor
+	Sim.machine_cycled.connect(func(uid: int) -> void:
+		if uid != extractor.uid: return
+		assert(Land.tide_state.is_empty() and game.view._tide_tweens.is_empty())
+		for cell: Vector2i in game.view._tiles:
+			assert(game.view._tiles[cell].get_meta("land_id") == Land.get_parcel("forest", cell).land)
+		extractor_saw_settled_board = true)
+	last_row = 0
 	Land.start_tide()
 	var edge: int = int(Land.tide_state.edge)
-	for row in range(11):
+	for row in range(1, Land.GRID):
 		last_row = row
-		Land.tick(0.71)
+		Land.tick(Land.TIDE_ROW_SECONDS)
 		await get_tree().process_frame
+	Land.tick(Land.TIDE_ROW_SECONDS)
 	assert(Land.tide_state.is_empty())
+	assert(extractor_saw_settled_board)
 	assert(events > 0)
 	for b: String in Data.biome_order:
 		for y in range(11):

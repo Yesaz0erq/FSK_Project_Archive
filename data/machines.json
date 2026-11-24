@@ -3,7 +3,7 @@
     "propagator": {
       "name": "Propagator", "kind": "propagator", "tier": "FT1", "support": 1, "site_life_min": 0,
       "supply": "self", "area": "adjacent", "radius": 1, "cost": 0, "living": true,
-      "description": "After a tide, seed the four adjoining plots as grass, add 1 Life concentration to each, and stabilize them.",
+      "description": "Every 15 seconds of game time, seed the four adjoining plots as grass, add 1 Life concentration to each, and stabilize them.",
       "deployment": {
         "method": "flora", "life_cost": 1,
         "instructions": "Plant 1 Life. Leave the first 5-second window empty, then wait 10 seconds."
@@ -12,7 +12,7 @@
     "collector": {
       "name": "Collector", "kind": "collector", "tier": "FT1", "support": 1, "site_life_min": 1,
       "supply": "self", "area": "adjacent", "radius": 1, "cost": 0, "living": true,
-      "description": "After a tide, gain 1 Life point per 8 total Life concentration on the four adjoining plots, rounded down.",
+      "description": "Every 15 seconds of game time, gain 1 Life point per 8 total Life concentration on the four adjoining plots, rounded down.",
       "deployment": {
         "method": "flora", "life_cost": 2,
         "instructions": "Plant 1 Life and add 1 more within 5 seconds. Leave the next 10-second window empty, then wait 10 seconds."
